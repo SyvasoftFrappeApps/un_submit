@@ -1,5 +1,6 @@
 frappe.ui.form.on("Purchase Receipt", {
     refresh: function(frm) {
+        if (frm.doc.docstatus === 1){
         let is_submitted = frm.doc.docstatus === 1;
         let button_label = is_submitted ? "Switch to Draft" : "Switch to Submit";
         let confirmation_message = is_submitted
@@ -18,6 +19,7 @@ frappe.ui.form.on("Purchase Receipt", {
             );
         });
     }
+}
 });
 
 function toggle_docstatus(frm) {
