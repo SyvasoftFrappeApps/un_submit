@@ -35,7 +35,7 @@ def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
 						)
 					)
 
-def custom_validate_with_previous_doc(self):
+def custom_validate_with_previous_doc(self, method):
 		if self.ignore_permissions == 0:	
 			super().validate_with_previous_doc(
 				{
