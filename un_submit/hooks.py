@@ -161,7 +161,11 @@ doctype_js = {
 # 		"on_trash": "method"
 # 	}
 # }
-
+doc_events = {
+    "Purchase Receipt": {
+        "on_submit": "un_submit.server_script.purchase_receipt_override.after_submit_purchase_receipt"
+    }
+}
 # Scheduled Tasks
 # ---------------
 

@@ -103,3 +103,29 @@ def custom_validate_rate_with_reference_doc(self, ref_details):
 								)
 		if stop_actions:
 			frappe.throw(stop_actions, as_list=True)
+
+from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import execute_repost_item_valuation
+
+def after_submit_purchase_receipt(doc, method):
+    # Ensure the purchase receipt is not ignoring permissions
+    if doc.ignore_permissions:  # Equivalent to `ignore_permissions == 1`
+        try:
+            # Create a new Repost Item Valuation
+            repost_doc = frappe.get_doc({
+                "doctype": "Repost Item Valuation",
+                "based_on": "Transaction",
+                "voucher_type": "Purchase Receipt",
+                "voucher_no": doc.name  # Purchase Receipt ID
+            })
+
+            # Insert and Submit the document
+            repost_doc.insert()
+            repost_doc.submit()
+
+            # Manually execute the reposting function (Simulating "Start Reposting" button)
+            frappe.get_doc("Scheduled Job Type", "repost_item_valuation.repost_entries").enqueue(force=True)
+			
+            frappe.msgprint(f"Repost Item Valuation created for {doc.name}")
+
+        except Exception as e:
+            frappe.log_error(frappe.get_traceback(), "Repost Item Valuation Error")
