@@ -2,21 +2,31 @@ import frappe
 
 @frappe.whitelist()
 def revert_docstatus(doctype, name):
+    """
+    Toggle the docstatus of a document and its child records between Draft (0) and Submitted (1).
+    
+    :param doctype: The main document type (e.g., "Purchase Receipt").
+    :param name: The name (ID) of the document.
+    """
     doc = frappe.get_doc(doctype, name)
+
+    # Determine the new docstatus (toggle between 0 and 1)
+    new_docstatus = 0 if doc.docstatus == 1 else 1
+    if  new_docstatus == 0:
+        frappe.db.set_value(doctype, name, "ignore_permissions", 1)
+
+    # Update the main document's docstatus
+    frappe.db.set_value(doctype, name, "docstatus", new_docstatus)
     
-    if doc.docstatus == 1:  # Ensure the main document is submitted
-        # Revert the main document to draft
-        frappe.db.set_value(doctype, name, "docstatus", 0)
-        
-        # Loop through all child table fields in the document
-        for table_field in doc.meta.get_table_fields():
-            if doc.get(table_field.fieldname):
-                for child in doc.get(table_field.fieldname):
-                    # If the child document has a docstatus and is submitted, revert it to draft
-                    if hasattr(child, 'docstatus') and child.docstatus == 1:
-                        frappe.db.set_value(child.doctype, child.name, "docstatus", 0)
-                        
-        frappe.db.commit()
-        return {"success": True, "message": "Document and its child table rows reverted to Draft"}
-    
-    return {"success": False, "message": "Document is not in a submitted state"}
+
+    # Loop through all child tables and update their docstatus
+    for table_field in doc.meta.get_table_fields():
+        if doc.get(table_field.fieldname):
+            for child in doc.get(table_field.fieldname):
+                if hasattr(child, 'docstatus') and child.docstatus != new_docstatus:
+                    frappe.db.set_value(child.doctype, child.name, "docstatus", new_docstatus)
+
+    frappe.db.commit()
+
+    action = "reverted to Draft" if new_docstatus == 0 else "submitted successfully"
+    return {"success": True, "message": f"Document and its child table rows {action}."}

@@ -8,6 +8,17 @@ app_license = "mit"
 # Apps
 # ------------------
 
+# override purchase receipt
+from erpnext.stock.doctype.purchase_receipt.purchase_receipt import  PurchaseReceipt
+from un_submit.server_script import purchase_receipt_override
+from erpnext.utilities.transaction_base import  TransactionBase
+from erpnext.controllers.stock_controller import  StockController
+
+
+PurchaseReceipt.validate_with_previous_doc = purchase_receipt_override.custom_validate_with_previous_doc
+StockController.validate_duplicate_serial_and_batch_bundle =  purchase_receipt_override.custom_validate_duplicate_serial_and_batch_bundle
+TransactionBase.validate_with_previous_doc = purchase_receipt_override.custom_validate_with_previous_doc
+TransactionBase.validate_rate_with_reference_doc = purchase_receipt_override.custom_validate_rate_with_reference_doc
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
