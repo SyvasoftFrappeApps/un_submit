@@ -1,4 +1,5 @@
 import frappe
+import json
 from frappe.utils import cint, flt, get_datetime, getdate, nowdate
 
 def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
@@ -136,25 +137,31 @@ from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import ex
 
 @frappe.whitelist()
 def after_submit_purchase_receipt(doc, method):
+    # Convert doc to a dictionary if it is a JSON string
+    if isinstance(doc, str):
+        doc = json.loads(doc)
+    
     # Ensure the purchase receipt is not ignoring permissions
-    if getattr(doc, "ignore_permissions", None) == 1:	  # Equivalent to `ignore_permissions == 1`
+    # (Note: the comment implies this check is equivalent to ignore_permissions == 1,
+    # so verify if your condition is correct)
+    if doc.get("ignore_permissions") == 1:
         try:
             # Create a new Repost Item Valuation
             repost_doc = frappe.get_doc({
                 "doctype": "Repost Item Valuation",
                 "based_on": "Transaction",
                 "voucher_type": "Purchase Receipt",
-                "voucher_no": doc.name  # Purchase Receipt ID
+                "voucher_no": doc.get("name")  # Purchase Receipt ID
             })
-
+            
             # Insert and Submit the document
             repost_doc.insert()
             repost_doc.submit()
 
             # Manually execute the reposting function (Simulating "Start Reposting" button)
             frappe.get_doc("Scheduled Job Type", "repost_item_valuation.repost_entries").enqueue(force=True)
-			
-            frappe.msgprint(f"Repost Item Valuation created for {doc.name}")
+            
+            frappe.msgprint(f"Repost Item Valuation created for {doc.get('name')}")
 
         except Exception as e:
             frappe.log_error(frappe.get_traceback(), "Repost Item Valuation Error")
