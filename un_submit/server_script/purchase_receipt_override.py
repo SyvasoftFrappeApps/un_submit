@@ -28,15 +28,15 @@ def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
 
 			if data:
 				data = data[0]
-				if self.ignore_permissions == 0:
+				if getattr(self, "ignore_permissions", None) == 0:
 					frappe.throw(
 						_("Serial and Batch Bundle {0} is already used in {1} {2}.").format(
 							frappe.bold(data.serial_and_batch_bundle), data.voucher_type, data.voucher_no
 						)
 					)
 
-def custom_validate_with_previous_doc(self, method):
-		if self.ignore_permissions == 0:	
+def custom_validate_with_previous_doc(self, *args, **kwargs):
+		if getattr(self, "ignore_permissions", None) == 0:	
 			super().validate_with_previous_doc(
 				{
 					"Purchase Order": {
@@ -54,8 +54,8 @@ def custom_validate_with_previous_doc(self, method):
 
 		if (
 			cint(frappe.db.get_single_value("Buying Settings", "maintain_same_rate"))
-			and not self.is_return
-			and not self.is_internal_supplier
+			and not getattr(self, "is_return", False)
+			and not getattr(self, "is_return", False)
 		):
 			self.validate_rate_with_reference_doc(
 				[["Purchase Order", "purchase_order", "purchase_order_item"]]
@@ -85,7 +85,7 @@ def custom_validate_rate_with_reference_doc(self, ref_details):
 					ref_rate = reference_details.get(d.get(ref_link_field))
 
 					if abs(flt(d.rate - ref_rate, d.precision("rate"))) >= 0.01:
-						if self.ignore_permissions == 0:
+						if getattr(self, "ignore_permissions", None) == 0:
 							if action == "Stop":
 								if role_allowed_to_override not in frappe.get_roles():
 									stop_actions.append(
