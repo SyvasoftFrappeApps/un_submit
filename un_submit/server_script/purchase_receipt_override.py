@@ -35,15 +35,10 @@ def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
 						)
 					)
 
-from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
-
-# Store the original method reference to avoid recursive calls.
-original_validate_with_previous_doc = PurchaseReceipt.validate_with_previous_doc
-
 def custom_validate_with_previous_doc(self, *args, **kwargs):
-    # If ignore_permissions is set to 0, call the original method
     if getattr(self, "ignore_permissions", None) == 0:
-        original_validate_with_previous_doc(
+        from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
+        PurchaseReceipt.validate_with_previous_doc(
             self,
             {
                 "Purchase Order": {
@@ -59,7 +54,7 @@ def custom_validate_with_previous_doc(self, *args, **kwargs):
             }
         )
 
-    # Check if the system is set to maintain same rate and not a return
+    # Note: The duplicate 'not getattr(self, "is_return", False)' has been reduced to one check.
     if (
         cint(frappe.db.get_single_value("Buying Settings", "maintain_same_rate"))
         and not getattr(self, "is_return", False)
@@ -67,10 +62,6 @@ def custom_validate_with_previous_doc(self, *args, **kwargs):
         self.validate_rate_with_reference_doc(
             [["Purchase Order", "purchase_order", "purchase_order_item"]]
         )
-
-# Override the original method with the custom method
-PurchaseReceipt.validate_with_previous_doc = custom_validate_with_previous_doc
-
 
 		
 def custom_validate_rate_with_reference_doc(self, ref_details):
