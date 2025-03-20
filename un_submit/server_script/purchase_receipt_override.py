@@ -134,6 +134,7 @@ def transaction_validate_with_previous_doc(self, ref):
 
 from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import execute_repost_item_valuation
 
+@frappe.whitelist
 def after_submit_purchase_receipt(doc, method):
     # Ensure the purchase receipt is not ignoring permissions
     if getattr(doc, "ignore_permissions", None) == 1:	  # Equivalent to `ignore_permissions == 1`
