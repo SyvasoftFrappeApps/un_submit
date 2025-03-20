@@ -41,17 +41,26 @@ frappe.ui.form.on("Purchase Receipt", {
 });
 
 function toggle_docstatus(frm, action) {
-    // Set the method based on the action required
+    // Determine the server method to call based on the action
     let method = action === "draft" 
         ? "un_submit.utils.revert_docstatus.revert_docstatus" 
         : "un_submit.server_script.purchase_receipt_override.after_submit_purchase_receipt";
 
+    // Build the arguments object
+    let args = {
+        doctype: frm.doc.doctype,
+        name: frm.doc.name
+    };
+
+    // For the "submit" action, pass the full document and method parameters as expected by the server
+    if (action === "submit") {
+        args.doc = frm.doc;
+        args.method = "submit";
+    }
+
     frappe.call({
         method: method,
-        args: {
-            doctype: frm.doc.doctype,
-            name: frm.doc.name
-        },
+        args: args,
         callback: function(response) {
             if (!response.exc) {
                 frappe.show_alert({
