@@ -36,30 +36,33 @@ def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
 					)
 
 def custom_validate_with_previous_doc(self, *args, **kwargs):
-		if getattr(self, "ignore_permissions", None) == 0:	
-			super().validate_with_previous_doc(
-				{
-					"Purchase Order": {
-						"ref_dn_field": "purchase_order",
-						"compare_fields": [["supplier", "="], ["company", "="], ["currency", "="]],
-					},
-					"Purchase Order Item": {
-						"ref_dn_field": "purchase_order_item",
-						"compare_fields": [["project", "="], ["uom", "="], ["item_code", "="]],
-						"is_child_table": True,
-						"allow_duplicate_prev_row_id": True,
-					},
-				}
-			)
+    if getattr(self, "ignore_permissions", None) == 0:
+        from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
+        PurchaseReceipt.validate_with_previous_doc(
+            self,
+            {
+                "Purchase Order": {
+                    "ref_dn_field": "purchase_order",
+                    "compare_fields": [["supplier", "="], ["company", "="], ["currency", "="]],
+                },
+                "Purchase Order Item": {
+                    "ref_dn_field": "purchase_order_item",
+                    "compare_fields": [["project", "="], ["uom", "="], ["item_code", "="]],
+                    "is_child_table": True,
+                    "allow_duplicate_prev_row_id": True,
+                },
+            }
+        )
 
-		if (
-			cint(frappe.db.get_single_value("Buying Settings", "maintain_same_rate"))
-			and not getattr(self, "is_return", False)
-			and not getattr(self, "is_return", False)
-		):
-			self.validate_rate_with_reference_doc(
-				[["Purchase Order", "purchase_order", "purchase_order_item"]]
-			)
+    # Note: The duplicate 'not getattr(self, "is_return", False)' has been reduced to one check.
+    if (
+        cint(frappe.db.get_single_value("Buying Settings", "maintain_same_rate"))
+        and not getattr(self, "is_return", False)
+    ):
+        self.validate_rate_with_reference_doc(
+            [["Purchase Order", "purchase_order", "purchase_order_item"]]
+        )
+
 		
 def custom_validate_rate_with_reference_doc(self, ref_details):
 		if self.get("is_internal_supplier"):
