@@ -108,7 +108,7 @@ from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import ex
 
 def after_submit_purchase_receipt(doc, method):
     # Ensure the purchase receipt is not ignoring permissions
-    if doc.ignore_permissions:  # Equivalent to `ignore_permissions == 1`
+    if getattr(doc, "ignore_permissions", None) == 0:	  # Equivalent to `ignore_permissions == 1`
         try:
             # Create a new Repost Item Valuation
             repost_doc = frappe.get_doc({
