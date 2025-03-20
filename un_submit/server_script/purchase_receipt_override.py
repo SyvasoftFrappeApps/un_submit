@@ -107,6 +107,30 @@ def custom_validate_rate_with_reference_doc(self, ref_details):
 		if stop_actions:
 			frappe.throw(stop_actions, as_list=True)
 
+def transaction_validate_with_previous_doc(self, ref):
+		if getattr(self, "ignore_permissions", None) == 0:
+			self.exclude_fields = ["conversion_factor", "uom"] if self.get("is_return") else []
+
+			for key, val in ref.items():
+				is_child = val.get("is_child_table")
+				ref_doc = {}
+				item_ref_dn = []
+				for d in self.get_all_children(self.doctype + " Item"):
+					ref_dn = d.get(val["ref_dn_field"])
+					if ref_dn:
+						if is_child:
+							self.compare_values({key: [ref_dn]}, val["compare_fields"], d)
+							if ref_dn not in item_ref_dn:
+								item_ref_dn.append(ref_dn)
+							elif not val.get("allow_duplicate_prev_row_id"):
+								frappe.throw(_("Duplicate row {0} with same {1}").format(d.idx, key))
+						elif ref_dn:
+							ref_doc.setdefault(key, [])
+							if ref_dn not in ref_doc[key]:
+								ref_doc[key].append(ref_dn)
+				if ref_doc:
+					self.compare_values(ref_doc, val["compare_fields"])
+
 from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import execute_repost_item_valuation
 
 def after_submit_purchase_receipt(doc, method):
