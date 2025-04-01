@@ -1,4 +1,5 @@
 import frappe
+from frappe.query_builder import DocType
 
 @frappe.whitelist()
 def revert_docstatus(doctype, name):
@@ -47,3 +48,33 @@ def revert_docstatus(doctype, name):
     frappe.db.commit()
     action = "reverted to Draft" if new_docstatus == 0 else "submitted successfully"
     return {"success": True, "message": f"Document and its child table rows {action}."}
+
+
+
+@frappe.whitelist()
+def set_purchase_invoice(docname, purchase_invoice):
+    """Set Purchase Invoice in all Purchase Receipt Items using Query Builder"""
+    
+    try:
+        PurchaseReceiptItem = DocType("Purchase Receipt Item")
+
+        # Update all Purchase Receipt Items linked to the given Purchase Receipt
+        (
+            frappe.qb.update(PurchaseReceiptItem)
+            .set(PurchaseReceiptItem.purchase_invoice, purchase_invoice)
+            .where(PurchaseReceiptItem.parent == docname)
+        ).run()
+
+        frappe.db.commit()
+
+        frappe.msgprint(
+            msg="Purchase Invoice updated successfully.",
+            title="Success",
+            indicator="green"
+        )
+        return "success"
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Purchase Invoice Update Error")
+        return "error"
+
