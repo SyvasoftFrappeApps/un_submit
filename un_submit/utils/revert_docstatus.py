@@ -78,3 +78,27 @@ def set_purchase_invoice(docname, purchase_invoice):
         frappe.log_error(frappe.get_traceback(), "Purchase Invoice Update Error")
         return "error"
 
+
+@frappe.whitelist()
+def toggle_ignore_link_sql(doctype, docname):
+    # Check the field exists in the doctype
+    if not frappe.db.has_column(doctype, "ignore_linked_document"):
+        frappe.throw(f"Field 'ignore_linked_document' not found in {doctype}")
+
+    # Fetch current value
+    current_value = frappe.db.get_value(doctype, docname, "ignore_linked_document")
+
+    # Toggle value: 1 becomes 0, 0 becomes 1
+    new_value = 0 if current_value else 1
+
+    # Update using SQL
+    frappe.db.sql(
+        f"UPDATE `tab{doctype}` SET ignore_linked_document = %s WHERE name = %s",
+        (new_value, docname)
+    )
+    frappe.db.commit()
+
+    return {
+        "status": "Toggled",
+        "new_value": new_value
+    }

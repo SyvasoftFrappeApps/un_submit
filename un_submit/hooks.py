@@ -60,8 +60,11 @@ TransactionBase.validate_rate_with_reference_doc = purchase_receipt_override.cus
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
 doctype_js = {
-        "Purchase Receipt": [
+    "Purchase Receipt": [
         "client_script/purchase_receipt.js"
+    ],
+    "Purchase Invoice": [
+        "client_script/purchase_invoice.js"
     ]
 }
 
@@ -164,6 +167,9 @@ doctype_js = {
 doc_events = {
     "Purchase Receipt": {
         "on_submit": "un_submit.server_script.purchase_receipt_override.after_submit_purchase_receipt"
+    },
+    "Purchase Invoice": {
+        "before_cancel": "un_submit.server_script.purchase_invoice.before_cancel"
     }
 }
 # Scheduled Tasks
