@@ -102,12 +102,17 @@ doctype_js = {
 # Installation
 # ------------
 
+after_install = [
+    "un_submit.setup.custom_field_setup.install_custom_fields"
+]
 # before_install = "un_submit.install.before_install"
 # after_install = "un_submit.install.after_install"
 
 # Uninstallation
 # ------------
-
+before_uninstall =[
+    "un_submit.setup.custom_field_setup.uninstall_custom_fields"
+]
 # before_uninstall = "un_submit.uninstall.before_uninstall"
 # after_uninstall = "un_submit.uninstall.after_uninstall"
 

@@ -1,0 +1,1 @@
+# config = ["Inventory Operator","Manager","ERP Admin","Pharma Sales User","Pharma Sales Manager"]
