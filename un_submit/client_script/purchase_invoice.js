@@ -1,6 +1,6 @@
 frappe.ui.form.on("Purchase Invoice", {
     refresh(frm) {
-        if (!frm.doc.__islocal) {
+        if (!frm.doc.__islocal && frm.doc.docstatus === 1) {
             frm.add_custom_button(
                 frm.doc.ignore_linked_document ? "Disable Ignore Linked" : "Enable Ignore Linked",
                 () => {
