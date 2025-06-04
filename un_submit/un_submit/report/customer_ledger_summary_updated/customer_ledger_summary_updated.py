@@ -9,6 +9,7 @@ from frappe.query_builder.functions import IfNull
 from frappe.utils import getdate, nowdate
 from frappe.utils.nestedset import get_descendants_of
 from pypika.terms import LiteralValue
+from pypika.functions import Count
 
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
@@ -104,7 +105,7 @@ class PartyLedgerSummaryReport:
 		pe = qb.DocType("Payment Entry")
 		query = (
 			qb.from_(pe)
-			.select(pe.party, pe.workflow_state, frappe.functions.Count("*").as_("count"))
+			.select(pe.party, pe.workflow_state, Count("*").as_("count"))
 			.where(
 				(pe.party_type == self.filters.party_type)
 				& (pe.party.isin(self.parties))
