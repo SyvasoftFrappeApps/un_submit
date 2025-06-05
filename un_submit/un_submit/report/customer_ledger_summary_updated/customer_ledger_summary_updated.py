@@ -9,7 +9,7 @@ from frappe.query_builder.functions import IfNull
 from frappe.utils import getdate, nowdate
 from frappe.utils.nestedset import get_descendants_of
 from pypika.terms import LiteralValue
-from pypika.functions import Count
+from pypika.functions import Count, Sum
 
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
@@ -94,22 +94,30 @@ class PartyLedgerSummaryReport:
 	def get_cheque_count(self):
 		if self.filters.party_type != "Customer":
 			return
-		
-		print("Hello")
 
-		# Initialize count dicts
 		self.cheque_counts = frappe._dict()
 		for party in self.parties:
-			self.cheque_counts[party] = {"cheque_received": 0, "cheque_pending": 0}
+			self.cheque_counts[party] = {
+				"cheque_received_count": 0,
+				"cheque_received_amount": 0.0,
+				"cheque_deposited_count": 0,
+				"cheque_deposited_amount": 0.0,
+			}
 
 		pe = qb.DocType("Payment Entry")
+
 		query = (
 			qb.from_(pe)
-			.select(pe.party, pe.workflow_state, Count("*").as_("count"))
+			.select(
+				pe.party,
+				pe.workflow_state,
+				Count("*").as_("count"),
+				Sum(pe.paid_amount).as_("total_amount")
+			)
 			.where(
 				(pe.party_type == self.filters.party_type)
 				& (pe.party.isin(self.parties))
-				& (pe.workflow_state.isin(["Cheque Received", "Pending"]))
+				& (pe.workflow_state.isin(["Cheque Received", "Cheque Deposited"]))
 				& (pe.posting_date.between(self.filters.from_date, self.filters.to_date))
 			)
 			.groupby(pe.party, pe.workflow_state)
@@ -119,10 +127,11 @@ class PartyLedgerSummaryReport:
 
 		for row in results:
 			if row.workflow_state == "Cheque Received":
-				self.cheque_counts[row.party]["cheque_received"] = row["count"]
-			elif row.workflow_state == "Pending":
-				self.cheque_counts[row.party]["cheque_pending"] = row["count"]
-
+				self.cheque_counts[row.party]["cheque_received_count"] = row["count"]
+				self.cheque_counts[row.party]["cheque_received_amount"] = row["total_amount"]
+			elif row.workflow_state == "Cheque Deposited":
+				self.cheque_counts[row.party]["cheque_deposited_count"] = row["count"]
+				self.cheque_counts[row.party]["cheque_deposited_amount"] = row["total_amount"]
 
 	def get_party_conditions(self, doctype):
 		conditions = []
@@ -189,18 +198,6 @@ class PartyLedgerSummaryReport:
 		credit_or_debit_note = "Credit Note" if self.filters.party_type == "Customer" else "Debit Note"
 
 		columns += [
-			{
-				"label": "Cheque Pending",
-				"fieldtype": "Int",
-				"fieldname": "cheque_pending",
-				"width": 150,
-			},
-			{
-				"label": "Cheque Received",
-				"fieldtype": "Int",
-				"fieldname": "cheque_received",
-				"width": 150,
-			},
 			{
 				"label": _("Opening Balance"),
 				"fieldname": "opening_balance",
@@ -277,6 +274,30 @@ class PartyLedgerSummaryReport:
 					"options": "Customer Group",
 					"hidden": 1,
 				},
+				{
+					"label": "Cheque Received Count",
+					"fieldtype": "Int",
+					"fieldname": "cheque_received_count",
+					"width": 150,
+				},
+				{
+					"label": "Cheque Received Amount",
+					"fieldtype": "Currency",
+					"fieldname": "cheque_received_amount",
+					"width": 150,
+				},
+				{
+					"label": "Cheque Deposited Count",
+					"fieldtype": "Int",
+					"fieldname": "cheque_deposited_count",
+					"width": 150,
+				},
+				{
+					"label": "Cheque Deposited Amount",
+					"fieldtype": "Currency",
+					"fieldname": "cheque_deposited_amount",
+					"width": 150,
+				},
 			]
 		else:
 			columns += [
@@ -339,8 +360,13 @@ class PartyLedgerSummaryReport:
 				or row.closing_amount
 			):
 				cheque_data = self.cheque_counts.get(party, {})
-				row.cheque_received = cheque_data.get("cheque_received", 0)
-				row.cheque_pending = cheque_data.get("cheque_pending", 0)
+
+				row.cheque_received_count = cheque_data.get("cheque_received_count", 0)
+				row.cheque_received_amount = cheque_data.get("cheque_received_amount", 0.0)
+
+				row.cheque_deposited_count = cheque_data.get("cheque_deposited_count", 0)
+				row.cheque_deposited_amount = cheque_data.get("cheque_deposited_amount", 0.0)
+
 
 				total_party_adjustment = sum(
 					amount for amount in self.party_adjustment_details.get(party, {}).values()
