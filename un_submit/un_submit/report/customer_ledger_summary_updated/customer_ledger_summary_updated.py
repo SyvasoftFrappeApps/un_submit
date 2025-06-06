@@ -225,6 +225,7 @@ class PartyLedgerSummaryReport:
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 120,
+				"hidden": 1
 			},
 		]
 
