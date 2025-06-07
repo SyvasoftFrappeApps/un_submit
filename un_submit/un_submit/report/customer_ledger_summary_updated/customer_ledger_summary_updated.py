@@ -238,6 +238,7 @@ class PartyLedgerSummaryReport:
 					"options": "currency",
 					"width": 120,
 					"is_adjustment": 1,
+					"hidden":1
 				}
 			)
 
