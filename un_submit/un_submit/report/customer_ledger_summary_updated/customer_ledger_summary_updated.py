@@ -10,6 +10,7 @@ from frappe.utils import getdate, nowdate
 from frappe.utils.nestedset import get_descendants_of
 from pypika.terms import LiteralValue
 from pypika.functions import Count, Sum
+from pypika import CustomFunction
 
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
@@ -26,6 +27,9 @@ class PartyLedgerSummaryReport:
 		self.filters = frappe._dict(filters or {})
 		self.filters.from_date = getdate(self.filters.from_date or nowdate())
 		self.filters.to_date = getdate(self.filters.to_date or nowdate())
+		# Hardcode aging ranges to 10, 15 days
+		self.ranges = [10, 15]
+		self.range_numbers = [1, 2, 3]  # For 0-10, 10-15, Above 15
 
 	def run(self, args):
 		self.filters.party_type = args.get("party_type")
@@ -40,12 +44,62 @@ class PartyLedgerSummaryReport:
 		self.get_return_invoices()
 		self.get_party_adjustment_amounts()
 		self.get_cheque_count()
-
+		self.get_due_amounts_by_ageing()
 		self.party_naming_by = frappe.db.get_single_value(args.get("naming_by")[0], args.get("naming_by")[1])
 		columns = self.get_columns()
 		data = self.get_data()
 
 		return columns, data
+	
+	def get_due_amounts_by_ageing(self):
+		"""Fetch due amounts for each party based on aging ranges (0-10, 10-15, Above 15 days)."""
+		doctype = "Sales Invoice" if self.filters.party_type == "Customer" else "Purchase Invoice"
+		party_field = "customer" if self.filters.party_type == "Customer" else "supplier"
+		
+		# Define CustomFunction for MySQL DATEDIFF
+		DATEDIFF = CustomFunction('DATEDIFF', ['end_date', 'start_date'])
+		
+		self.due_amounts = frappe._dict()
+		for party in self.parties:
+			self.due_amounts[party] = {f"ageing_range_{i}": 0.0 for i in self.range_numbers}
+			self.due_amounts[party]["total_due"] = 0.0
+
+		today = getdate(nowdate())
+		conditions = []
+		for idx, range_end in enumerate(self.ranges):
+			range_start = 0 if idx == 0 else self.ranges[idx - 1]
+			days_diff = DATEDIFF(today, qb.Field("due_date"))
+			conditions.append(
+				((days_diff >= range_start) & (days_diff < range_end), f"ageing_range_{idx + 1}", range_start, range_end)
+			)
+		conditions.append(
+			(DATEDIFF(today, qb.Field("due_date")) >= self.ranges[-1], f"ageing_range_{len(self.ranges) + 1}", self.ranges[-1], "Above")
+		)
+
+		doc = qb.DocType(doctype)
+		for condition, range_key, range_start, range_end in conditions:
+			query = (
+				qb.from_(doc)
+				.select(
+					doc[party_field].as_("party"),
+					Sum(doc.outstanding_amount).as_("due_amount")
+				)
+				.where(
+					(doc.docstatus == 1)
+					& (doc[party_field].isin(self.parties))
+					& (doc.outstanding_amount > 0)
+					& (doc.posting_date <= self.filters.to_date)
+					& condition
+				)
+				.groupby(doc[party_field])
+			)
+			if self.filters.company:
+				query = query.where(doc.company == self.filters.company)
+			
+			results = query.run(as_dict=True)
+			for row in results:
+				self.due_amounts[row.party][range_key] = row.due_amount
+				self.due_amounts[row.party]["total_due"] += row.due_amount
 
 	def validate_filters(self):
 		if not self.filters.get("company"):
@@ -257,6 +311,36 @@ class PartyLedgerSummaryReport:
 				"options": "Currency",
 				"width": 50,
 			},
+			{
+				"label": _("0-10 Days"),
+				"fieldname": "ageing_range_1",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			},
+			{
+				"label": _("10-15 Days"),
+				"fieldname": "ageing_range_2",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			},
+			{
+				"label": _("Above 15 Days"),
+				"fieldname": "ageing_range_3",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+				"hidden": 1
+			},
+			{
+				"label": _("Payment Due"),
+				"fieldname": "payment_due",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+				"hidden": 1
+			},
 		]
 
 		# Hidden columns for handling 'User Permissions'
@@ -335,6 +419,8 @@ class PartyLedgerSummaryReport:
 						"return_amount": 0,
 						"closing_balance": 0,
 						"currency": company_currency,
+						**{f"ageing_range_{i}": 0.0 for i in self.range_numbers},
+						"payment_due": 0.0,
 					}
 				),
 			)
@@ -378,7 +464,11 @@ class PartyLedgerSummaryReport:
 				adjustments = self.party_adjustment_details.get(party, {})
 				for account in self.party_adjustment_accounts:
 					row["adj_" + scrub(account)] = adjustments.get(account, 0)
-
+				due_data = self.due_amounts.get(party, {})
+				for i in self.range_numbers:
+					row[f"ageing_range_{i}"] = due_data.get(f"ageing_range_{i}", 0.0)
+				# Calculate payment_due as closing_balance - (ageing_range_1 + ageing_range_2)
+				row.payment_due = row.closing_balance - (row.ageing_range_1 + row.ageing_range_2)
 				out.append(row)
 
 		return out

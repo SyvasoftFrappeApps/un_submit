@@ -92,6 +92,6 @@ frappe.query_reports["Customer Ledger Summary Updated"] = {
 			label: __("Customer Name"),
 			fieldtype: "Data",
 			hidden: 1,
-		},
+		}
 	],
 };
