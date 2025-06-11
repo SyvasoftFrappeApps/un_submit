@@ -31,6 +31,12 @@ frappe.query_reports["Cheque Wise Pending Payment Summary Updated"] = {
 			'fieldname': 'payment_entry',
 			'fieldtype': 'Select',
 			'options': ' \nYes\nNo'
+		},
+		{
+			'label': 'Apple ID',
+			'fieldname': 'apple_id',
+			'fieldtype': 'Select',
+			'options': ' \nYes\nNo'
 		}
 		
 	]
