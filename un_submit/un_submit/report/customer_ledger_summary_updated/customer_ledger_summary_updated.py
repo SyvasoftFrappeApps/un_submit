@@ -1,7 +1,6 @@
 # Copyright (c) 2013, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-
 import frappe
 from frappe import _, qb, scrub
 from frappe.query_builder import Criterion, Tuple
@@ -10,7 +9,7 @@ from frappe.utils import getdate, nowdate
 from frappe.utils.nestedset import get_descendants_of
 from pypika.terms import LiteralValue
 from pypika.functions import Count, Sum
-from pypika import CustomFunction
+from pypika import CustomFunction  # Added for DATEDIFF
 
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
@@ -27,19 +26,24 @@ class PartyLedgerSummaryReport:
 		self.filters = frappe._dict(filters or {})
 		self.filters.from_date = getdate(self.filters.from_date or nowdate())
 		self.filters.to_date = getdate(self.filters.to_date or nowdate())
-		# Hardcode aging ranges to 10, 15 days
-		self.ranges = [10, 15]
-		self.range_numbers = [1, 2, 3]  # For 0-10, 10-15, Above 15
+		# Initialize dynamic aging ranges
+		if not self.filters.get("due_amount_ageing_range"):
+			self.filters.due_amount_ageing_range = "30, 60"  # Default ranges
+		try:
+			self.ranges = [int(num.strip()) for num in self.filters.due_amount_ageing_range.split(",") if num.strip().isdigit()]
+			self.ranges = sorted(self.ranges)  # Ensure ranges are sorted
+			if not self.ranges:
+				frappe.throw(_("Aging ranges must contain at least one valid positive integer"))
+			self.range_numbers = list(range(1, len(self.ranges) + 2))  # Include last range (Above)
+		except ValueError:
+			frappe.throw(_("Invalid aging range format. Please provide comma-separated positive integers (e.g., '30, 60')"))
 
 	def run(self, args):
 		self.filters.party_type = args.get("party_type")
-
 		self.validate_filters()
 		self.get_party_details()
-
 		if not self.parties:
 			return [], []
-
 		self.get_gl_entries()
 		self.get_return_invoices()
 		self.get_party_adjustment_amounts()
@@ -48,11 +52,10 @@ class PartyLedgerSummaryReport:
 		self.party_naming_by = frappe.db.get_single_value(args.get("naming_by")[0], args.get("naming_by")[1])
 		columns = self.get_columns()
 		data = self.get_data()
-
 		return columns, data
-	
+
 	def get_due_amounts_by_ageing(self):
-		"""Fetch due amounts for each party based on aging ranges (0-10, 10-15, Above 15 days)."""
+		"""Fetch due amounts for each party based on dynamic aging ranges."""
 		doctype = "Sales Invoice" if self.filters.party_type == "Customer" else "Purchase Invoice"
 		party_field = "customer" if self.filters.party_type == "Customer" else "supplier"
 		
@@ -104,10 +107,8 @@ class PartyLedgerSummaryReport:
 	def validate_filters(self):
 		if not self.filters.get("company"):
 			frappe.throw(_("{0} is mandatory").format(_("Company")))
-
 		if self.filters.from_date > self.filters.to_date:
 			frappe.throw(_("From Date must be before To Date"))
-
 		self.update_hierarchical_filters()
 
 	def update_hierarchical_filters(self):
@@ -117,13 +118,9 @@ class PartyLedgerSummaryReport:
 				self.filters[key] = get_children(doctype, self.filters[key])
 
 	def get_party_details(self):
-		"""
-		Additional Columns for 'User Permission' based access control
-		"""
 		self.parties = []
 		self.party_details = frappe._dict()
 		party_type = self.filters.party_type
-
 		doctype = qb.DocType(party_type)
 		conditions = self.get_party_conditions(doctype)
 		query = (
@@ -131,24 +128,18 @@ class PartyLedgerSummaryReport:
 			.select(doctype.name.as_("party"), f"{scrub(party_type)}_name")
 			.where(Criterion.all(conditions))
 		)
-
 		from frappe.desk.reportview import build_match_conditions
-
 		match_conditions = build_match_conditions(party_type)
-
 		if match_conditions:
 			query = query.where(LiteralValue(match_conditions))
-
 		party_details = query.run(as_dict=True)
-
 		for row in party_details:
 			self.parties.append(row.party)
 			self.party_details[row.party] = row
-	
+
 	def get_cheque_count(self):
 		if self.filters.party_type != "Customer":
 			return
-
 		self.cheque_counts = frappe._dict()
 		for party in self.parties:
 			self.cheque_counts[party] = {
@@ -157,9 +148,7 @@ class PartyLedgerSummaryReport:
 				"cheque_deposited_count": 0,
 				"cheque_deposited_amount": 0.0,
 			}
-
 		pe = qb.DocType("Payment Entry")
-
 		query = (
 			qb.from_(pe)
 			.select(
@@ -176,9 +165,7 @@ class PartyLedgerSummaryReport:
 			)
 			.groupby(pe.party, pe.workflow_state)
 		)
-
 		results = query.run(as_dict=True)
-
 		for row in results:
 			if row.workflow_state == "Cheque Received":
 				self.cheque_counts[row.party]["cheque_received_count"] = row["count"]
@@ -190,26 +177,19 @@ class PartyLedgerSummaryReport:
 	def get_party_conditions(self, doctype):
 		conditions = []
 		group_field = "customer_group" if self.filters.party_type == "Customer" else "supplier_group"
-
 		if self.filters.party:
 			conditions.append(doctype.name == self.filters.party)
-
 		if self.filters.territory:
 			conditions.append(doctype.territory.isin(self.filters.territory))
-
 		if self.filters.get(group_field):
 			conditions.append(doctype[group_field].isin(self.filters.get(group_field)))
-
 		if self.filters.payment_terms_template:
 			conditions.append(doctype.payment_terms == self.filters.payment_terms_template)
-
 		if self.filters.sales_partner:
 			conditions.append(doctype.default_sales_partner.isin(self.filters.sales_partner))
-
 		if self.filters.sales_person:
 			sales_team = qb.DocType("Sales Team")
 			sales_invoice = qb.DocType("Sales Invoice")
-
 			customers = (
 				qb.from_(sales_team)
 				.select(sales_team.parent)
@@ -223,9 +203,7 @@ class PartyLedgerSummaryReport:
 				.where(sales_team.sales_person.isin(self.filters.sales_person))
 				.where(sales_team.parenttype == "Sales Invoice")
 			)
-
 			conditions.append(doctype.name.isin(customers))
-
 		return conditions
 
 	def get_columns(self):
@@ -244,7 +222,6 @@ class PartyLedgerSummaryReport:
 				"width": 200,
 			},
 		]
-
 		if self.party_naming_by == "Naming Series":
 			columns.append(
 				{
@@ -254,9 +231,7 @@ class PartyLedgerSummaryReport:
 					"width": 150,
 				}
 			)
-
 		credit_or_debit_note = "Credit Note" if self.filters.party_type == "Customer" else "Debit Note"
-
 		columns += [
 			{
 				"label": _("Opening Balance"),
@@ -285,10 +260,39 @@ class PartyLedgerSummaryReport:
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 120,
-				"hidden": 1
+				"hidden": 1,
 			},
 		]
-
+		for idx, range_end in enumerate(self.ranges):
+			range_start = 0 if idx == 0 else self.ranges[idx - 1]
+			columns.append(
+				{
+					"label": _("{0}-{1} Days").format(range_start, range_end),
+					"fieldname": f"ageing_range_{idx + 1}",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				}
+			)
+		columns.append(
+			{
+				"label": _("Above {0} Days").format(self.ranges[-1]),
+				"fieldname": f"ageing_range_{len(self.ranges) + 1}",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			}
+		)
+		columns.append(
+			{
+				"label": _("Payment Due"),
+				"fieldname": "payment_due",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+				"hidden": 1
+			}
+		)
 		for account in self.party_adjustment_accounts:
 			columns.append(
 				{
@@ -298,10 +302,9 @@ class PartyLedgerSummaryReport:
 					"options": "currency",
 					"width": 120,
 					"is_adjustment": 1,
-					"hidden":1
+					"hidden": 1,
 				}
 			)
-
 		columns += [
 			{
 				"label": _("Closing Balance"),
@@ -317,39 +320,7 @@ class PartyLedgerSummaryReport:
 				"options": "Currency",
 				"width": 50,
 			},
-			{
-				"label": _("0-10 Days"),
-				"fieldname": "ageing_range_1",
-				"fieldtype": "Currency",
-				"options": "currency",
-				"width": 120,
-			},
-			{
-				"label": _("10-15 Days"),
-				"fieldname": "ageing_range_2",
-				"fieldtype": "Currency",
-				"options": "currency",
-				"width": 120,
-			},
-			{
-				"label": _("Above 15 Days"),
-				"fieldname": "ageing_range_3",
-				"fieldtype": "Currency",
-				"options": "currency",
-				"width": 120,
-				"hidden": 1
-			},
-			{
-				"label": _("Payment Due"),
-				"fieldname": "payment_due",
-				"fieldtype": "Currency",
-				"options": "currency",
-				"width": 120,
-				"hidden": 1
-			},
 		]
-
-		# Hidden columns for handling 'User Permissions'
 		if self.filters.party_type == "Customer":
 			columns += [
 				{
@@ -367,25 +338,25 @@ class PartyLedgerSummaryReport:
 					"hidden": 1,
 				},
 				{
-					"label": "Cheque Received Count",
+					"label": _("Cheque Received Count"),
 					"fieldtype": "Int",
 					"fieldname": "cheque_received_count",
 					"width": 150,
 				},
 				{
-					"label": "Cheque Received Amount",
+					"label": _("Cheque Received Amount"),
 					"fieldtype": "Currency",
 					"fieldname": "cheque_received_amount",
 					"width": 150,
 				},
 				{
-					"label": "Cheque Deposited Count",
+					"label": _("Cheque Deposited Count"),
 					"fieldtype": "Int",
 					"fieldname": "cheque_deposited_count",
 					"width": 150,
 				},
 				{
-					"label": "Cheque Deposited Amount",
+					"label": _("Cheque Deposited Amount"),
 					"fieldtype": "Currency",
 					"fieldname": "cheque_deposited_amount",
 					"width": 150,
@@ -401,15 +372,13 @@ class PartyLedgerSummaryReport:
 					"hidden": 1,
 				}
 			]
-
 		return columns
 
 	def get_data(self):
 		company_currency = frappe.get_cached_value("Company", self.filters.get("company"), "default_currency")
 		invoice_dr_or_cr = "debit" if self.filters.party_type == "Customer" else "credit"
 		reverse_dr_or_cr = "credit" if self.filters.party_type == "Customer" else "debit"
-
-		self.party_data = frappe._dict({})
+		self.party_data = frappe._dict()
 		for gle in self.gl_entries:
 			party_details = self.party_details.get(gle.party)
 			party_name = party_details.get(f"{scrub(self.filters.party_type)}_name", "")
@@ -429,16 +398,15 @@ class PartyLedgerSummaryReport:
 						"payment_due": 0.0,
 						"apple_id": ""
 					}
-				),
+				)
 			)
-
+			
 			if self.filters.party_type == "Customer":
 				apple_id = frappe.db.get_value("Customer", gle.party, "apple_id")
 				self.party_data[gle.party]["apple_id"] = apple_id or ""
-
+				
 			amount = gle.get(invoice_dr_or_cr) - gle.get(reverse_dr_or_cr)
 			self.party_data[gle.party].closing_balance += amount
-
 			if gle.posting_date < self.filters.from_date or gle.is_opening == "Yes":
 				self.party_data[gle.party].opening_balance += amount
 			else:
@@ -448,7 +416,6 @@ class PartyLedgerSummaryReport:
 					self.party_data[gle.party].return_amount -= amount
 				else:
 					self.party_data[gle.party].paid_amount -= amount
-
 		out = []
 		for party, row in self.party_data.items():
 			if (
@@ -456,32 +423,26 @@ class PartyLedgerSummaryReport:
 				or row.invoiced_amount
 				or row.paid_amount
 				or row.return_amount
-				or row.closing_amount
+				or row.closing_balance
 			):
 				cheque_data = self.cheque_counts.get(party, {})
-
 				row.cheque_received_count = cheque_data.get("cheque_received_count", 0)
 				row.cheque_received_amount = cheque_data.get("cheque_received_amount", 0.0)
-
 				row.cheque_deposited_count = cheque_data.get("cheque_deposited_count", 0)
 				row.cheque_deposited_amount = cheque_data.get("cheque_deposited_amount", 0.0)
-
-
 				total_party_adjustment = sum(
 					amount for amount in self.party_adjustment_details.get(party, {}).values()
 				)
 				row.paid_amount -= total_party_adjustment
-
 				adjustments = self.party_adjustment_details.get(party, {})
 				for account in self.party_adjustment_accounts:
 					row["adj_" + scrub(account)] = adjustments.get(account, 0)
 				due_data = self.due_amounts.get(party, {})
 				for i in self.range_numbers:
 					row[f"ageing_range_{i}"] = due_data.get(f"ageing_range_{i}", 0.0)
-				# Calculate payment_due as closing_balance - (ageing_range_1 + ageing_range_2)
-				row.payment_due = row.closing_balance - (row.ageing_range_1 + row.ageing_range_2)
+				total_due = due_data.get("total_due", 0.0)
+				row.payment_due = total_due - row.closing_balance
 				out.append(row)
-
 		return out
 
 	def get_gl_entries(self):
@@ -506,27 +467,20 @@ class PartyLedgerSummaryReport:
 				& (gle.party.isin(self.parties))
 			)
 		)
-
 		query = self.prepare_conditions(query)
-
 		self.gl_entries = query.run(as_dict=True)
 
 	def prepare_conditions(self, query):
 		gle = qb.DocType("GL Entry")
 		if self.filters.company:
 			query = query.where(gle.company == self.filters.company)
-
 		if self.filters.finance_book:
 			query = query.where(IfNull(gle.finance_book, "") == self.filters.finance_book)
-
 		if self.filters.cost_center:
 			query = query.where((gle.cost_center).isin(self.filters.cost_center))
-
 		if self.filters.project:
 			query = query.where((gle.project).isin(self.filters.project))
-
 		accounting_dimensions = get_accounting_dimensions(as_list=False)
-
 		if accounting_dimensions:
 			for dimension in accounting_dimensions:
 				if self.filters.get(dimension.fieldname):
@@ -541,35 +495,27 @@ class PartyLedgerSummaryReport:
 						query = query.where(
 							(gle[dimension.fieldname]).isin(self.filters.get(dimension.fieldname))
 						)
-
 		return query
 
 	def get_return_invoices(self):
 		doctype = "Sales Invoice" if self.filters.party_type == "Customer" else "Purchase Invoice"
-		filters = (
-			{
-				"is_return": 1,
-				"docstatus": 1,
-				"posting_date": ["between", [self.filters.from_date, self.filters.to_date]],
-				f"{scrub(self.filters.party_type)}": ["in", self.parties],
-			},
-		)
-
+		filters = {
+			"is_return": 1,
+			"docstatus": 1,
+			"posting_date": ["between", [self.filters.from_date, self.filters.to_date]],
+			f"{scrub(self.filters.party_type)}": ["in", self.parties],
+		}
 		self.return_invoices = frappe.get_all(doctype, filters=filters, pluck="name")
 
 	def get_party_adjustment_amounts(self):
 		account_type = "Expense Account" if self.filters.party_type == "Customer" else "Income Account"
-
 		invoice_dr_or_cr = "debit" if self.filters.party_type == "Customer" else "credit"
 		reverse_dr_or_cr = "credit" if self.filters.party_type == "Customer" else "debit"
 		round_off_account = frappe.get_cached_value("Company", self.filters.company, "round_off_account")
-
 		current_period_vouchers = set()
 		adjustment_voucher_entries = {}
-
 		self.party_adjustment_details = {}
 		self.party_adjustment_accounts = set()
-
 		for gle in self.gl_entries:
 			if (
 				gle.is_opening != "Yes"
@@ -578,10 +524,8 @@ class PartyLedgerSummaryReport:
 			):
 				current_period_vouchers.add((gle.voucher_type, gle.voucher_no))
 				adjustment_voucher_entries.setdefault((gle.voucher_type, gle.voucher_no), []).append(gle)
-
 		if not current_period_vouchers:
 			return
-
 		gl = qb.DocType("GL Entry")
 		query = (
 			qb.from_(gl)
@@ -599,15 +543,12 @@ class PartyLedgerSummaryReport:
 		)
 		query = self.prepare_conditions(query)
 		gl_entries = query.run(as_dict=True)
-
 		for gle in gl_entries:
 			adjustment_voucher_entries[(gle.voucher_type, gle.voucher_no)].append(gle)
-
 		for voucher_gl_entries in adjustment_voucher_entries.values():
 			parties = {}
 			accounts = {}
 			has_irrelevant_entry = False
-
 			for gle in voucher_gl_entries:
 				if gle.account == round_off_account:
 					continue
@@ -619,7 +560,6 @@ class PartyLedgerSummaryReport:
 					accounts[gle.account] += gle.get(invoice_dr_or_cr) - gle.get(reverse_dr_or_cr)
 				else:
 					has_irrelevant_entry = True
-
 			if parties and accounts:
 				if len(parties) == 1:
 					party = next(iter(parties.keys()))
@@ -640,13 +580,10 @@ class PartyLedgerSummaryReport:
 def get_children(doctype, value):
 	if not isinstance(value, list):
 		value = [d.strip() for d in value.strip().split(",") if d]
-
 	all_children = []
-
 	for d in value:
-		all_children += get_descendants_of(doctype, value)
+		all_children += get_descendants_of(doctype, d)
 		all_children.append(d)
-
 	return list(set(all_children))
 
 
@@ -655,5 +592,4 @@ def execute(filters=None):
 		"party_type": "Customer",
 		"naming_by": ["Selling Settings", "cust_master_name"],
 	}
-
 	return PartyLedgerSummaryReport(filters).run(args)

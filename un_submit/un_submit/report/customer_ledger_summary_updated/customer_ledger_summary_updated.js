@@ -97,6 +97,12 @@ frappe.query_reports["Customer Ledger Summary Updated"] = {
 			fieldname: "apple_id",
 			label: __("Apple ID"),
 			fieldtype: "Data"
-		}
+		},
+		{
+            fieldname: "due_amount_ageing_range",
+            label: __("Due Amount Ageing Range"),
+            fieldtype: "Data",
+            default: "30, 60"
+		},
 	],
 };
