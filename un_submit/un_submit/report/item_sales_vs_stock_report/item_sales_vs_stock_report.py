@@ -48,7 +48,7 @@ def get_data(filters):
                 (SUM(IFNULL(bin.actual_qty, 0)) / NULLIF(SUM(IF(si.posting_date BETWEEN %(from_date)s AND %(to_date)s, si_item.qty, 0)), 0)),
                 2
             ) AS custom_qty,
-            MAX(tc.apple_id) AS apple_id
+            IF(MAX(tc.apple_id) IS NOT NULL AND MAX(tc.apple_id) != '', 'Yes', 'No') AS apple_id
         FROM
             tabItem item
         LEFT JOIN tabBin bin ON bin.item_code = item.item_code
