@@ -237,6 +237,12 @@ class PartyLedgerSummaryReport:
 				"options": self.filters.party_type,
 				"width": 200,
 			},
+			{
+				"label": _("Apple ID"),
+				"fieldtype": "Data",
+				"fieldname": "apple_id",
+				"width": 200,
+			},
 		]
 
 		if self.party_naming_by == "Naming Series":
@@ -421,9 +427,14 @@ class PartyLedgerSummaryReport:
 						"currency": company_currency,
 						**{f"ageing_range_{i}": 0.0 for i in self.range_numbers},
 						"payment_due": 0.0,
+						"apple_id": ""
 					}
 				),
 			)
+
+			if self.filters.party_type == "Customer":
+				apple_id = frappe.db.get_value("Customer", gle.party, "apple_id")
+				self.party_data[gle.party]["apple_id"] = apple_id or ""
 
 			amount = gle.get(invoice_dr_or_cr) - gle.get(reverse_dr_or_cr)
 			self.party_data[gle.party].closing_balance += amount
