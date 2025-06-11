@@ -36,6 +36,12 @@ def get_data(filters):
     if filters.get("warehouse"):
         conditions += " AND bin.warehouse = %(warehouse)s"
 
+    if filters.get("apple_id") == "Yes":
+        conditions += " AND tc.apple_id IS NOT NULL AND tc.apple_id != ''"
+    elif filters.get("apple_id") == "No":
+        conditions += " AND (tc.apple_id IS NULL OR tc.apple_id = '')"
+
+
     return frappe.db.sql(f"""
         SELECT
             item.item_code,
