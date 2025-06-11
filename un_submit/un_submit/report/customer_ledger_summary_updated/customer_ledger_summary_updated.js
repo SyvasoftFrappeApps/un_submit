@@ -92,6 +92,11 @@ frappe.query_reports["Customer Ledger Summary Updated"] = {
 			label: __("Customer Name"),
 			fieldtype: "Data",
 			hidden: 1,
+		},
+		{
+			fieldname: "apple_id",
+			label: __("Apple ID"),
+			fieldtype: "Data"
 		}
 	],
 };

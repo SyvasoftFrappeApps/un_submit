@@ -16,16 +16,24 @@ frappe.query_reports["Item Sales vs Stock Report"] = {
 			"reqd": 1
 		},
 		{
-			"fieldname": "item_group",
-			"label": "Item Group",
-			"fieldtype": "Link",
-			"options": "Item Group"
+			fieldname: "item_group",
+			label: __("Item Group"),
+			fieldtype: "MultiSelectList",
+			options: "Item Group",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Item Group");
+			},
 		},
 		{
 			"fieldname": "warehouse",
 			"label": "Warehouse",
 			"fieldtype": "Link",
 			"options": "Warehouse"
+		},
+		{
+			"fieldname": "apple_id",
+			"label": "Apple ID",
+			"fieldtype": "Data"
 		}
 	]
 };
