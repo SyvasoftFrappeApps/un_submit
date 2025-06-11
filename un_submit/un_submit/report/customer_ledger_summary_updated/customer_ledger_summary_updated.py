@@ -402,8 +402,8 @@ class PartyLedgerSummaryReport:
 			)
 			
 			if self.filters.party_type == "Customer":
-				apple_id = frappe.db.get_value("Customer", gle.party, "apple_id")
-				self.party_data[gle.party]["apple_id"] = apple_id or ""
+				apple_id_status = "Yes" if frappe.db.get_value("Customer", gle.party, "apple_id") else "No"
+				self.party_data[gle.party]["apple_id"] = apple_id_status or ""
 				
 			amount = gle.get(invoice_dr_or_cr) - gle.get(reverse_dr_or_cr)
 			self.party_data[gle.party].closing_balance += amount
