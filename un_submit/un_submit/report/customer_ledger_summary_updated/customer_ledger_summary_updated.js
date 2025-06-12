@@ -100,10 +100,10 @@ frappe.query_reports["Customer Ledger Summary Updated"] = {
 			'options': ' \nYes\nNo'
 		},
 		{
-            fieldname: "due_amount_ageing_range",
-            label: __("Due Amount Ageing Range"),
+            fieldname: "avg_outstanding_ranges",
+            label: __("Average Outstanding"),
             fieldtype: "Data",
-            default: "30, 60"
+            default: "10, 15"
 		},
 	],
 };

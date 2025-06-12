@@ -5,7 +5,7 @@ import frappe
 from frappe import _, qb, scrub
 from frappe.query_builder import Criterion, Tuple
 from frappe.query_builder.functions import IfNull
-from frappe.utils import getdate, nowdate
+from frappe.utils import getdate, nowdate, add_days
 from frappe.utils.nestedset import get_descendants_of
 from pypika.terms import LiteralValue
 from pypika.functions import Count, Sum
@@ -26,17 +26,14 @@ class PartyLedgerSummaryReport:
 		self.filters = frappe._dict(filters or {})
 		self.filters.from_date = getdate(self.filters.from_date or nowdate())
 		self.filters.to_date = getdate(self.filters.to_date or nowdate())
-		# Initialize dynamic aging ranges
-		if not self.filters.get("due_amount_ageing_range"):
-			self.filters.due_amount_ageing_range = "30, 60"  # Default ranges
-		try:
-			self.ranges = [int(num.strip()) for num in self.filters.due_amount_ageing_range.split(",") if num.strip().isdigit()]
-			self.ranges = sorted(self.ranges)  # Ensure ranges are sorted
-			if not self.ranges:
-				frappe.throw(_("Aging ranges must contain at least one valid positive integer"))
-			self.range_numbers = list(range(1, len(self.ranges) + 2))  # Include last range (Above)
-		except ValueError:
-			frappe.throw(_("Invalid aging range format. Please provide comma-separated positive integers (e.g., '30, 60')"))
+		# Parse multiple ranges from filters (e.g., "10, 15" or "20, 40, 60")
+		self.ranges = [
+			int(num.strip()) for num in self.filters.get("avg_outstanding_ranges", "10").split(",")
+			if num.strip().isdigit() and int(num.strip()) > 0
+		]
+		self.ranges = sorted(self.ranges)  # Ensure ranges are sorted
+		if not self.ranges:
+			frappe.throw(_("Average outstanding ranges must contain at least one valid positive integer"))
 
 	def run(self, args):
 		self.filters.party_type = args.get("party_type")
@@ -48,61 +45,77 @@ class PartyLedgerSummaryReport:
 		self.get_return_invoices()
 		self.get_party_adjustment_amounts()
 		self.get_cheque_count()
-		self.get_due_amounts_by_ageing()
+		self.get_average_outstanding()
 		self.party_naming_by = frappe.db.get_single_value(args.get("naming_by")[0], args.get("naming_by")[1])
 		columns = self.get_columns()
 		data = self.get_data()
 		return columns, data
 
-	def get_due_amounts_by_ageing(self):
-		"""Fetch due amounts for each party based on dynamic aging ranges."""
-		doctype = "Sales Invoice" if self.filters.party_type == "Customer" else "Purchase Invoice"
-		party_field = "customer" if self.filters.party_type == "Customer" else "supplier"
-		
-		# Define CustomFunction for MySQL DATEDIFF
-		DATEDIFF = CustomFunction('DATEDIFF', ['end_date', 'start_date'])
-		
-		self.due_amounts = frappe._dict()
+	def get_average_outstanding(self):
+		"""Calculate average outstanding for each party over each range."""
+		self.avg_outstanding = frappe._dict()
 		for party in self.parties:
-			self.due_amounts[party] = {f"ageing_range_{i}": 0.0 for i in self.range_numbers}
-			self.due_amounts[party]["total_due"] = 0.0
+			self.avg_outstanding[party] = frappe._dict()
+			for idx, days_range in enumerate(self.ranges):
+				avg_balance = self.get_average_outstanding_for_customer(party, days_range)
+				self.avg_outstanding[party][idx] = round(avg_balance, 2)
 
-		today = getdate(nowdate())
-		conditions = []
-		for idx, range_end in enumerate(self.ranges):
-			range_start = 0 if idx == 0 else self.ranges[idx - 1]
-			days_diff = DATEDIFF(today, qb.Field("due_date"))
-			conditions.append(
-				((days_diff >= range_start) & (days_diff < range_end), f"ageing_range_{idx + 1}", range_start, range_end)
+	def get_average_outstanding_for_customer(self, customer, days_range):
+		"""
+		Calculate average outstanding for a customer over a given days range.
+		Formula: (Current Closing Balance - Invoiced Amount in Range) / day_range
+		"""
+		gle = qb.DocType("GL Entry")
+		customer_table = qb.DocType("Customer")
+		invoice_dr_or_cr = "debit" if self.filters.party_type == "Customer" else "credit"
+		reverse_dr_or_cr = "credit" if self.filters.party_type == "Customer" else "debit"
+
+		# 1. Get Current Closing Balance up to to_date
+		closing_balance_query = (
+			qb.from_(gle)
+			.select(
+				Sum(gle[invoice_dr_or_cr] - gle[reverse_dr_or_cr]).as_("balance")
 			)
-		conditions.append(
-			(DATEDIFF(today, qb.Field("due_date")) >= self.ranges[-1], f"ageing_range_{len(self.ranges) + 1}", self.ranges[-1], "Above")
+			.where(
+				(gle.docstatus < 2)
+				& (gle.is_cancelled == 0)
+				& (gle.party_type == self.filters.party_type)
+				& (IfNull(gle.party, "") != "")
+				& (gle.posting_date <= self.filters.to_date)
+				& (gle.party == customer)
+			)
 		)
+		closing_balance_query = self.prepare_conditions(closing_balance_query)
+		closing_balance = closing_balance_query.run()[0][0] or 0
 
-		doc = qb.DocType(doctype)
-		for condition, range_key, range_start, range_end in conditions:
-			query = (
-				qb.from_(doc)
-				.select(
-					doc[party_field].as_("party"),
-					Sum(doc.outstanding_amount).as_("due_amount")
-				)
-				.where(
-					(doc.docstatus == 1)
-					& (doc[party_field].isin(self.parties))
-					& (doc.outstanding_amount > 0)
-					& (doc.posting_date <= self.filters.to_date)
-					& condition
-				)
-				.groupby(doc[party_field])
+		# 2. Get Invoiced Amount within the range (to_date - days_range to to_date)
+		invoiced_amount_query = (
+			qb.from_(gle)
+			.left_join(customer_table)
+			.on(gle.party == customer_table.name)
+			.select(
+				Sum(gle.debit).as_("total_invoiced_amount")
 			)
-			if self.filters.company:
-				query = query.where(doc.company == self.filters.company)
-			
-			results = query.run(as_dict=True)
-			for row in results:
-				self.due_amounts[row.party][range_key] = row.due_amount
-				self.due_amounts[row.party]["total_due"] += row.due_amount
+			.where(
+				(gle.party_type == "Customer")
+				& (gle.company == self.filters.company)
+				& (gle.is_cancelled == 0)
+				& (gle.docstatus < 2)
+				& (gle.posting_date.between(
+					add_days(self.filters.to_date, -days_range),
+					self.filters.to_date
+				))
+				& (gle.debit > 0)
+				& (gle.is_opening == "No")
+				& (gle.voucher_type.isin(["Sales Invoice", "Journal Entry"]))
+				& (gle.party == customer)
+			)
+		)
+		invoiced_amount = invoiced_amount_query.run()[0][0] or 0
+
+		# 3. Calculate average outstanding
+		avg_balance = (closing_balance - invoiced_amount) / days_range if days_range else 0
+		return avg_balance
 
 	def validate_filters(self):
 		if not self.filters.get("company"):
@@ -263,26 +276,6 @@ class PartyLedgerSummaryReport:
 				"hidden": 1,
 			},
 		]
-		for idx, range_end in enumerate(self.ranges):
-			range_start = 0 if idx == 0 else self.ranges[idx - 1]
-			columns.append(
-				{
-					"label": _("{0}-{1} Days").format(range_start, range_end),
-					"fieldname": f"ageing_range_{idx + 1}",
-					"fieldtype": "Currency",
-					"options": "currency",
-					"width": 120,
-				}
-			)
-		columns.append(
-			{
-				"label": _("Above {0} Days").format(self.ranges[-1]),
-				"fieldname": f"ageing_range_{len(self.ranges) + 1}",
-				"fieldtype": "Currency",
-				"options": "currency",
-				"width": 120,
-			}
-		)
 		columns.append(
 			{
 				"label": _("Payment Due"),
@@ -293,6 +286,18 @@ class PartyLedgerSummaryReport:
 				"hidden": 1
 			}
 		)
+		# Add dynamic columns for each range
+		for idx, range_end in enumerate(self.ranges):
+			range_start = 0 if idx == 0 else self.ranges[idx - 1]
+			columns.append(
+				{
+					"label": _("({0}-{1} Days)").format(range_start, range_end),
+					"fieldname": f"avg_outstanding_{idx + 1}",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 150,
+				}
+			)
 		for account in self.party_adjustment_accounts:
 			columns.append(
 				{
@@ -394,9 +399,10 @@ class PartyLedgerSummaryReport:
 						"return_amount": 0,
 						"closing_balance": 0,
 						"currency": company_currency,
-						**{f"ageing_range_{i}": 0.0 for i in self.range_numbers},
 						"payment_due": 0.0,
-						"apple_id": ""
+						"apple_id": "",
+						**{f"avg_outstanding_{idx + 1}": self.avg_outstanding.get(gle.party, {}).get(idx, 0)
+                           for idx in range(len(self.ranges))}
 					}
 				)
 			)
@@ -424,6 +430,7 @@ class PartyLedgerSummaryReport:
 				or row.paid_amount
 				or row.return_amount
 				or row.closing_balance
+				or any(row.get(f"avg_outstanding_{idx + 1}", 0) for idx in range(len(self.ranges)))
 			):
 				cheque_data = self.cheque_counts.get(party, {})
 				row.cheque_received_count = cheque_data.get("cheque_received_count", 0)
@@ -437,11 +444,6 @@ class PartyLedgerSummaryReport:
 				adjustments = self.party_adjustment_details.get(party, {})
 				for account in self.party_adjustment_accounts:
 					row["adj_" + scrub(account)] = adjustments.get(account, 0)
-				due_data = self.due_amounts.get(party, {})
-				for i in self.range_numbers:
-					row[f"ageing_range_{i}"] = due_data.get(f"ageing_range_{i}", 0.0)
-				total_due = due_data.get("total_due", 0.0)
-				row.payment_due = total_due - row.closing_balance
 				out.append(row)
 		return out
 
