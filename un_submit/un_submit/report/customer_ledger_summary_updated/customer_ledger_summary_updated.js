@@ -96,8 +96,7 @@ frappe.query_reports["Customer Ledger Summary Updated"] = {
 		{
 			'label': __('Apple ID'),
 			'fieldname': 'apple_id',
-			'fieldtype': 'Select',
-			'options': ' \nYes\nNo'
+			'fieldtype': 'Check'
 		},
 		{
             fieldname: "avg_outstanding_ranges",

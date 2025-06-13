@@ -23,6 +23,7 @@ class PartyLedgerSummaryReport:
         self.filters = frappe._dict(filters or {})
         self.filters.from_date = getdate(self.filters.from_date or nowdate())
         self.filters.to_date = getdate(self.filters.to_date or nowdate())
+        self.filters.apple_id = self.filters.get("apple_id", 0)
         self.ranges = [
             int(num.strip()) for num in self.filters.get("avg_outstanding_ranges", "10").split(",")
             if num.strip().isdigit() and int(num.strip()) > 0
@@ -121,7 +122,7 @@ class PartyLedgerSummaryReport:
         conditions = self.get_party_conditions(doctype)
         query = (
             qb.from_(doctype)
-            .select(doctype.name.as_("party"), f"{scrub(party_type)}_name")
+            .select(doctype.name.as_("party"), f"{scrub(party_type)}_name",IfNull(doctype.apple_id, "").as_("apple_id"))
             .where(Criterion.all(conditions))
         )
         from frappe.desk.reportview import build_match_conditions
@@ -200,6 +201,11 @@ class PartyLedgerSummaryReport:
                 .where(sales_team.parenttype == "Sales Invoice")
             )
             conditions.append(doctype.name.isin(customers))
+        if self.filters.party_type == "Customer":
+            if self.filters.apple_id:  # Checked: Show customers with Apple ID
+                conditions.append(IfNull(doctype.apple_id, "") != "")
+            else:  # Unchecked: Show customers without Apple ID
+                conditions.append(IfNull(doctype.apple_id, "") == "")
         return conditions
 
     def get_columns(self):
@@ -213,9 +219,9 @@ class PartyLedgerSummaryReport:
             },
             {
                 "label": _("Apple ID"),
-                "fieldtype": "Data",
+                "fieldtype": "Check",
                 "fieldname": "apple_id",
-                "width": 200,
+                "width": 100,
             },
         ]
         if self.party_naming_by == "Naming Series":
@@ -379,6 +385,7 @@ class PartyLedgerSummaryReport:
         for gle in self.gl_entries:
             party_details = self.party_details.get(gle.party)
             party_name = party_details.get(f"{scrub(self.filters.party_type)}_name", "")
+            apple_id_status = 1 if party_details.get("apple_id") else 0
             self.party_data.setdefault(
                 gle.party,
                 frappe._dict(
@@ -392,7 +399,7 @@ class PartyLedgerSummaryReport:
                         "closing_balance": 0,
                         "currency": company_currency,
                         "payment_due": 0.0,
-                        "apple_id": "",
+                        "apple_id": apple_id_status,
                         "first_invoiced_amount": self.get_first_invoiced_for_customer(gle.party, self.ranges[0]) if self.ranges else 0.0,
                         **{f"avg_outstanding_{idx + 1}": self.avg_outstanding.get(gle.party, {}).get(idx, 0)
                            for idx in range(len(self.ranges))}
@@ -400,7 +407,6 @@ class PartyLedgerSummaryReport:
                 )
             )
             if self.filters.party_type == "Customer":
-                apple_id_status = "Yes" if frappe.db.get_value("Customer", gle.party, "apple_id") else "No"
                 self.party_data[gle.party]["apple_id"] = apple_id_status or ""
             amount = gle.get(invoice_dr_or_cr) - gle.get(reverse_dr_or_cr)
             self.party_data[gle.party].closing_balance += amount
