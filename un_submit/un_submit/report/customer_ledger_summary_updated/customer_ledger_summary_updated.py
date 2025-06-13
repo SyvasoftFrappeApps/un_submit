@@ -63,7 +63,7 @@ class PartyLedgerSummaryReport:
 	def get_average_outstanding_for_customer(self, customer, days_range):
 		"""
 		Calculate average outstanding for a customer over a given days range.
-		Formula: (Current Closing Balance - Invoiced Amount in Range) / day_range
+		Formula: (Current Closing Balance - Invoiced Amount in Range)
 		"""
 		gle = qb.DocType("GL Entry")
 		customer_table = qb.DocType("Customer")
@@ -114,9 +114,44 @@ class PartyLedgerSummaryReport:
 		invoiced_amount = invoiced_amount_query.run()[0][0] or 0
 
 		# 3. Calculate average outstanding
-		# avg_balance = (closing_balance - invoiced_amount) / days_range if days_range else 0
-		avg_balance = (closing_balance - invoiced_amount)
+		avg_balance = max(closing_balance - invoiced_amount, 0)
 		return avg_balance
+
+	def get_first_invoiced_for_customer(self, customer, days_range):
+		"""
+		Calculate invoiced amount for a customer over a given days range.
+		"""
+		gle = qb.DocType("GL Entry")
+		customer_table = qb.DocType("Customer")
+		invoice_dr_or_cr = "debit" if self.filters.party_type == "Customer" else "credit"
+		reverse_dr_or_cr = "credit" if self.filters.party_type == "Customer" else "debit"
+
+		# Get Invoiced Amount within the range (to_date - days_range to to_date)
+		invoiced_amount_query = (
+			qb.from_(gle)
+			.left_join(customer_table)
+			.on(gle.party == customer_table.name)
+			.select(
+				Sum(gle.debit).as_("total_invoiced_amount")
+			)
+			.where(
+				(gle.party_type == "Customer")
+				& (gle.company == self.filters.company)
+				& (gle.is_cancelled == 0)
+				& (gle.docstatus < 2)
+				& (gle.posting_date.between(
+					add_days(self.filters.to_date, -days_range),
+					self.filters.to_date
+				))
+				& (gle.debit > 0)
+				& (gle.is_opening == "No")
+				& (gle.voucher_type.isin(["Sales Invoice", "Journal Entry"]))
+				& (gle.party == customer)
+			)
+		)
+		invoiced_amount = invoiced_amount_query.run()[0][0] or 0
+
+		return invoiced_amount
 
 	def validate_filters(self):
 		if not self.filters.get("company"):
@@ -287,6 +322,17 @@ class PartyLedgerSummaryReport:
 				"hidden": 1
 			}
 		)
+		# Add column for first invoiced amount using the first range
+		if self.ranges:
+			columns.append(
+				{
+					"label": _("Invoiced Amount (0-{0} Days)").format(self.ranges[0]),
+					"fieldname": "first_invoiced_amount",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 150,
+				}
+			)
 		# Add dynamic columns for each range
 		for idx, range_end in enumerate(self.ranges):
 			range_start = 0 if idx == 0 else self.ranges[idx - 1]
@@ -402,8 +448,9 @@ class PartyLedgerSummaryReport:
 						"currency": company_currency,
 						"payment_due": 0.0,
 						"apple_id": "",
+						"first_invoiced_amount": 0.0,
 						**{f"avg_outstanding_{idx + 1}": self.avg_outstanding.get(gle.party, {}).get(idx, 0)
-                           for idx in range(len(self.ranges))}
+							for idx in range(len(self.ranges))}
 					}
 				)
 			)
@@ -411,6 +458,11 @@ class PartyLedgerSummaryReport:
 			if self.filters.party_type == "Customer":
 				apple_id_status = "Yes" if frappe.db.get_value("Customer", gle.party, "apple_id") else "No"
 				self.party_data[gle.party]["apple_id"] = apple_id_status or ""
+				# Calculate first invoiced amount for the first range
+				if self.ranges:
+					self.party_data[gle.party]["first_invoiced_amount"] = self.get_first_invoiced_for_customer(
+						gle.party, self.ranges[0]
+					)
 				
 			amount = gle.get(invoice_dr_or_cr) - gle.get(reverse_dr_or_cr)
 			self.party_data[gle.party].closing_balance += amount
@@ -432,6 +484,7 @@ class PartyLedgerSummaryReport:
 				or row.return_amount
 				or row.closing_balance
 				or any(row.get(f"avg_outstanding_{idx + 1}", 0) for idx in range(len(self.ranges)))
+				or row.first_invoiced_amount
 			):
 				cheque_data = self.cheque_counts.get(party, {})
 				row.cheque_received_count = cheque_data.get("cheque_received_count", 0)
