@@ -114,7 +114,8 @@ class PartyLedgerSummaryReport:
 		invoiced_amount = invoiced_amount_query.run()[0][0] or 0
 
 		# 3. Calculate average outstanding
-		avg_balance = (closing_balance - invoiced_amount) / days_range if days_range else 0
+		# avg_balance = (closing_balance - invoiced_amount) / days_range if days_range else 0
+		avg_balance = (closing_balance - invoiced_amount)
 		return avg_balance
 
 	def validate_filters(self):
