@@ -222,6 +222,7 @@ class PartyLedgerSummaryReport:
                 "fieldtype": "Check",
                 "fieldname": "apple_id",
                 "width": 100,
+                "hidden":1
             },
         ]
         if self.party_naming_by == "Naming Series":
@@ -322,6 +323,7 @@ class PartyLedgerSummaryReport:
                 "fieldtype": "Link",
                 "options": "Currency",
                 "width": 50,
+                "hidden": 1
             },
         ]
         if self.filters.party_type == "Customer":
