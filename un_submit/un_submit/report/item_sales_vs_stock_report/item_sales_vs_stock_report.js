@@ -29,12 +29,6 @@ frappe.query_reports["Item Sales vs Stock Report"] = {
 			"label": "Warehouse",
 			"fieldtype": "Link",
 			"options": "Warehouse"
-		},
-		{
-			'label': 'Apple ID',
-			'fieldname': 'apple_id',
-			'fieldtype': 'Select',
-			'options': ' \nYes\nNo'
 		}
 	]
 };

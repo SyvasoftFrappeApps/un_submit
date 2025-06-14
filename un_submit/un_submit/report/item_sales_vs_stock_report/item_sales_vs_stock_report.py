@@ -20,7 +20,6 @@ def get_columns():
         {"label": "On Hand Qty", "fieldname": "on_hand_qty", "fieldtype": "Float", "width": 120},
         {"label": "Sold Qty", "fieldname": "sold_qty", "fieldtype": "Float", "width": 100},
         {"label": "Custom Qty (Ratio)", "fieldname": "custom_qty", "fieldtype": "Float", "width": 130},
-        {"label": "Apple ID", "fieldname": "apple_id", "fieldtype": "Data", "width": 130},
     ]
 
 def get_data(filters):
@@ -36,11 +35,6 @@ def get_data(filters):
     if filters.get("warehouse"):
         conditions += " AND bin.warehouse = %(warehouse)s"
 
-    if filters.get("apple_id") == "Yes":
-        conditions += " AND tc.apple_id IS NOT NULL AND tc.apple_id != ''"
-    elif filters.get("apple_id") == "No":
-        conditions += " AND (tc.apple_id IS NULL OR tc.apple_id = '')"
-
 
     return frappe.db.sql(f"""
         SELECT
@@ -53,14 +47,12 @@ def get_data(filters):
             ROUND(
                 (SUM(IFNULL(bin.actual_qty, 0)) / NULLIF(SUM(IF(si.posting_date BETWEEN %(from_date)s AND %(to_date)s, si_item.qty, 0)), 0)),
                 2
-            ) AS custom_qty,
-            IF(MAX(tc.apple_id) IS NOT NULL AND MAX(tc.apple_id) != '', 'Yes', 'No') AS apple_id
+            ) AS custom_qty
         FROM
             tabItem item
         LEFT JOIN tabBin bin ON bin.item_code = item.item_code
         LEFT JOIN `tabSales Invoice Item` si_item ON si_item.item_code = item.item_code
         LEFT JOIN `tabSales Invoice` si ON si.name = si_item.parent AND si.docstatus = 1
-        LEFT JOIN tabCustomer tc ON tc.name = si.customer
         WHERE 1=1 {conditions}
         GROUP BY
             item.item_code, item.item_name, item.item_group, bin.warehouse
