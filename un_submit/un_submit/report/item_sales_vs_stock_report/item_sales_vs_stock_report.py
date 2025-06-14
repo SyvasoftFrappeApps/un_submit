@@ -45,7 +45,7 @@ def get_data(filters):
             SUM(DISTINCT IFNULL(bin.actual_qty, 0)) AS on_hand_qty,
             SUM(IF(si.posting_date BETWEEN %(from_date)s AND %(to_date)s, si_item.qty, 0)) AS sold_qty,
             ROUND(
-                (SUM(IFNULL(bin.actual_qty, 0)) / NULLIF(SUM(IF(si.posting_date BETWEEN %(from_date)s AND %(to_date)s, si_item.qty, 0)), 0)),
+                (SUM(DISTINCT IFNULL(bin.actual_qty, 0)) / NULLIF(SUM(IF(si.posting_date BETWEEN %(from_date)s AND %(to_date)s, si_item.qty, 0)), 0)),
                 2
             ) AS custom_qty
         FROM
