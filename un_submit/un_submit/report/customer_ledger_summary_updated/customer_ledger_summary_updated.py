@@ -279,7 +279,7 @@ class PartyLedgerSummaryReport:
         if self.ranges:
             columns.append(
                 {
-                    "label": _("Invoiced Amount (0-{0} Days)").format(self.ranges[0]),
+                    "label": _("Due under {0} Days ").format(self.ranges[0]),
                     "fieldname": "first_invoiced_amount",
                     "fieldtype": "Currency",
                     "options": "currency",
@@ -290,7 +290,7 @@ class PartyLedgerSummaryReport:
             range_start = 0 if idx == 0 else self.ranges[idx - 1]
             columns.append(
                 {
-                    "label": _("({0}-{1} Days)").format(range_start, range_end),
+                    "label": _("Overdue more than {1} Days").format(range_start, range_end),
                     "fieldname": f"avg_outstanding_{idx + 1}",
                     "fieldtype": "Currency",
                     "options": "currency",
