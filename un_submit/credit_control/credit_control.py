@@ -1,3 +1,7 @@
+import frappe
+from frappe.utils import today, add_days
+import requests
+
 @frappe.whitelist()
 def validate_credit_block(doc, method):
     from frappe.utils import today, add_days
