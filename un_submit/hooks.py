@@ -175,6 +175,9 @@ doc_events = {
     },
     "Purchase Invoice": {
         "before_cancel": "un_submit.server_script.purchase_invoice.before_cancel"
+    },
+     "Sales Order": {
+        "validate": "un_submit.credit_control.credit_control.validate_credit_block"
     }
 }
 # Scheduled Tasks
