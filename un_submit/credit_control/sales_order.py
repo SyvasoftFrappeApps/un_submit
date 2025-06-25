@@ -39,7 +39,7 @@ def send_overdue_notification(sales_order):
                         "integration": {
                             "url": frappe.utils.get_url("/api/method/your.custom.submit_justification"),
                             "context": {
-                                "sales_order": {doc.name}
+                                "sales_order": doc.name
                             }
                         },
                         "type": "button",
@@ -51,7 +51,7 @@ def send_overdue_notification(sales_order):
                         "integration": {
                             "url": frappe.utils.get_url("/api/method/un_submit.credit_control.cancel_order"),
                             "context": {
-                                "sales_order": {doc.name}
+                                "sales_order": doc.name
                             }
                         },
                         "type": "button",
