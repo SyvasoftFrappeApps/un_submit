@@ -4,7 +4,7 @@ import frappe
 @frappe.whitelist()
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
-    
+    sales_order_url = frappe.utils.get_url(f"/app/sales-order/{doc.name}")
     # Customize your message
     message = f"""
 🛑 *Sales Order Blocked Due to Overdue!*
@@ -16,6 +16,7 @@ def send_overdue_notification(sales_order):
 • *Overdue Days:* XX
 
 👉 Please provide justification to proceed or cancel the order.
+    *Click this to submit Justification * ({sales_order_url})
 """
 
     # Raven API endpoint
@@ -30,37 +31,7 @@ def send_overdue_notification(sales_order):
     # Channel ID
     payload = {
         "channel_id": "general",
-        "text": message,
-         "attachments": [
-            {
-                "actions": [
-                    {
-                        "name": "submit_justification",
-                        "integration": {
-                            "url": frappe.utils.get_url("/api/method/your.custom.submit_justification"),
-                            "context": {
-                                "sales_order": doc.name
-                            }
-                        },
-                        "type": "button",
-                        "text": "📝 Submit Justification",
-                        "style": "primary"
-                    },
-                    {
-                        "name": "cancel_order",
-                        "integration": {
-                            "url": frappe.utils.get_url("/api/method/un_submit.credit_control.cancel_order"),
-                            "context": {
-                                "sales_order": doc.name
-                            }
-                        },
-                        "type": "button",
-                        "text": "❌ Cancel Order",
-                        "style": "danger"
-                    }
-                ]
-            }
-        ]
+        "text": message
     }
 
     try:
