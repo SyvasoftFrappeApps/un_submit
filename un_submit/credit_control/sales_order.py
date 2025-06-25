@@ -30,7 +30,7 @@ def send_overdue_notification(sales_order):
     # Channel ID
     payload = {
         "channel_id": "general",
-        "text": message
+        "text": message,
          "attachments": [
             {
                 "actions": [
