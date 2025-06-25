@@ -5,38 +5,35 @@ import frappe
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
     base_url = frappe.utils.get_url()
+    
     sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
-    justification_url = f"{base_url}/app/sales-order/{doc.name}#justification"
+    justification_url = f"{sales_order_url}#justification"
     cancel_order_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
-    # Customize Markdown table message
-    message = f"""
-🛑 **Sales Order Blocked Due to Overdue!**
+    message = f"""🛑 *Sales Order Blocked Due to Overdue!*
 
-| Field              | Value                                |
-|--------------------|----------------------------------------|
-| **Sales Order**    | [{doc.name}]({sales_order_url})        |
-| **Customer**       | {doc.customer_name}                   |
-| **Created By**     | {doc.owner}                           |
-| **Date**           | {doc.creation.strftime('%Y-%m-%d')}   |
-| **Overdue Amount** | ₹XX,XXX                               |
-| **Overdue Days**   | XX                                    |
+*Sales Order:* [{doc.name}]({sales_order_url})  
+*Customer:* {doc.customer_name}  
+*Created By:* {doc.owner}  
+*Date:* {doc.creation.strftime('%Y-%m-%d')}  
+*Overdue Amount:* ₹XX,XXX  
+*Overdue Days:* XX  
 
-👉 **Next Actions:**
-- 📝 [Submit Justification]({justification_url})
-- ❌ [Cancel Order]({cancel_order_url})
+👉 *Next Actions:*  
+📝 [Submit Justification]({justification_url})  
+❌ [Cancel Order]({cancel_order_url})
 """
 
-    # Raven Webhook Endpoint
+    # Raven Webhook
     raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
-    
+
     headers = {
-        "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",  # Replace with your actual token
+        "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",
         "Content-Type": "application/json"
     }
 
     payload = {
-        "channel_id": "general",  # Change to your actual channel
+        "channel_id": "general",  # Replace with your target channel
         "text": message
     }
 
