@@ -31,6 +31,36 @@ def send_overdue_notification(sales_order):
     payload = {
         "channel_id": "general",
         "text": message
+         "attachments": [
+            {
+                "actions": [
+                    {
+                        "name": "submit_justification",
+                        "integration": {
+                            "url": frappe.utils.get_url("/api/method/your.custom.submit_justification"),
+                            "context": {
+                                "sales_order": so_name
+                            }
+                        },
+                        "type": "button",
+                        "text": "📝 Submit Justification",
+                        "style": "primary"
+                    },
+                    {
+                        "name": "cancel_order",
+                        "integration": {
+                            "url": frappe.utils.get_url("/api/method/un_submit.credit_control.cancel_order"),
+                            "context": {
+                                "sales_order": so_name
+                            }
+                        },
+                        "type": "button",
+                        "text": "❌ Cancel Order",
+                        "style": "danger"
+                    }
+                ]
+            }
+        ]
     }
 
     try:
