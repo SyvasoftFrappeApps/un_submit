@@ -23,8 +23,8 @@ def send_overdue_notification(sales_order):
     
     # Get from browser dev tools when you send message manually in Raven
     headers = {
-        "Authorization": "token e9ffc25922df3cd:7f1526485145fda",
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",
+        "Content-Type": "application/json"
     }
 
     # Channel ID
