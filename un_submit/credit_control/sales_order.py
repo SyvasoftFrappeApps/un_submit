@@ -1,38 +1,49 @@
+import requests
 import frappe
 
 @frappe.whitelist()
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
+    base_url = frappe.utils.get_url()
 
-    overdue_amount = 12345
-    overdue_days = 60
+    sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
+    justification_url = f"{sales_order_url}#justification"
+    cancel_order_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
-    justification_url = frappe.utils.get_url(f"/app/sales-order/{doc.name}#justification")
-    cancel_url = frappe.utils.get_url(
-        f"/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
-    )
+    html_message = f"""
+<b>🛑 Sales Order Blocked Due to Overdue!</b><br><br>
 
-    full_message = f"""
-	🛑 *Sales Order Blocked Due to Overdue!*
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+    <tr><th align="left">Field</th><th align="left">Value</th></tr><br>
+    <tr><td><b>Sales Order</b></td><td><a href="{sales_order_url}">{doc.name}</a></td></tr><br>
+    <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr><br>
+    <tr><td><b>Created By</b></td><td>{doc.owner}</td></tr><br>
+    <tr><td><b>Date</b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
+</table><br>
 
-	Field	Value
-	Sales Order	{doc.name}
-	Customer	{doc.customer_name}
-	Created By	{doc.owner}
-	Date	{doc.creation.strftime('%Y-%m-%d')}
-	Overdue Amount	₹{overdue_amount}
-	Overdue Days	{overdue_days}
+<b>👉 Next Actions:</b><br>
+📝 <a href="{justification_url}">Submit Justification</a><br>
+❌ <a href="{cancel_order_url}">Cancel Order</a>
+"""
 
-	👉 *Next Actions:*
-	- 📝 [Submit Justification]({justification_url})
-    - ❌ [Cancel Order]({cancel_url})
-	"""
+    # Raven Webhook
+    raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
 
-    frappe.get_doc({
-        "doctype": "Raven Message",
+    headers = {
+        "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
         "channel_id": "general",
-        "text": full_message,
-        "message_type": "Text"
-    }).insert(ignore_permissions=True)
+        "text": html_message,
+        "is_html": True  # This tells Raven to render the message as HTML
+    }
 
-    return "Notification sent successfully."
+    try:
+        res = requests.post(raven_url, headers=headers, json=payload)
+        res.raise_for_status()
+        return "Notification sent to Raven."
+    except requests.RequestException as e:
+        frappe.log_error(str(e), "Raven Notification Failed")
+        return "Failed to send notification"
