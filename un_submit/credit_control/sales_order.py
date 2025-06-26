@@ -14,13 +14,12 @@ def send_overdue_notification(sales_order):
 <b>🛑 Sales Order Blocked Due to Overdue!</b><br><br>
 
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
-    <tr><th align="left">Field</th><th align="left">Value</th></tr>
-    <tr><td><b>Sales Order</b></td><td><a href="{sales_order_url}">{doc.name}</a></td></tr>
-    <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr>
-    <tr><td><b>Created By</b></td><td>{doc.owner}</td></tr>
-    <tr><td><b>Date</b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr>
-    <tr><td><b>Overdue Amount</b></td><td>₹XX,XXX</td></tr>
-    <tr><td><b>Overdue Days</b></td><td>XX</td></tr>
+    <tr><td><b>Sales Order</b></td><td><a href="{sales_order_url}">{doc.name}</a></td></tr><br>
+    <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr><br>
+    <tr><td><b>Created By</b></td><td>{doc.owner}</td></tr><br>
+    <tr><td><b>Date</b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
+    <tr><td><b>Overdue Amount</b></td><td>₹{overdue_amount:,.2f}</td></tr><br>
+    <tr><td><b>Overdue Days</b></td><td>{overdue_days}</td></tr>>
 </table><br>
 
 <b>👉 Next Actions:</b><br>
