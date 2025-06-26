@@ -4,6 +4,7 @@ import frappe
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
 
+    # Example logic — replace with your actual overdue check
     overdue_amount = 12345
     overdue_days = 60
 
@@ -12,7 +13,8 @@ def send_overdue_notification(sales_order):
         f"/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
     )
 
-    message = f"""
+    # Compose the full message
+    full_message = f"""
 🛑 *Sales Order Blocked Due to Overdue!*
 
 ```plaintext
@@ -30,10 +32,11 @@ def send_overdue_notification(sales_order):
 
 ❌ Cancel Order: {cancel_url}
 """
-
 frappe.get_doc({
 "doctype": "Raven Message",
 "channel_id": "general",
-"text": message,
+"text": full_message,
 "message_type": "Text"
 }).insert(ignore_permissions=True)
+
+return "Notification sent successfully."
