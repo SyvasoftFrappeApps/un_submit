@@ -18,8 +18,8 @@ def send_overdue_notification(sales_order):
     <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr><br>
     <tr><td><b>Created By</b></td><td>{doc.owner}</td></tr><br>
     <tr><td><b>Date</b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
-    <tr><td><b>Overdue Amount</b></td><td>₹{overdue_amount:,.2f}</td></tr><br>
-    <tr><td><b>Overdue Days</b></td><td>{overdue_days}</td></tr>>
+    <tr><td><b>Overdue Amount</b></td><td>₹XX,XXX</td></tr><br>
+    <tr><td><b>Overdue Days</b></td><td>XX</td></tr>
 </table><br>
 
 <b>👉 Next Actions:</b><br>
