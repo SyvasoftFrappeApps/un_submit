@@ -18,8 +18,7 @@ Sales Order     : {doc.name}
 Customer        : {doc.customer_name}
 Created By      : {doc.owner}
 Date            : {doc.creation.strftime('%Y-%m-%d')}
-Overdue Amount  : ₹{overdue_amount}
-Overdue Days    : {overdue_days}
+
 
 👉 Next Actions:
 📝 Submit Justification → {justification_url}
