@@ -4,13 +4,18 @@ import frappe
 @frappe.whitelist()
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
-    base_url = frappe.utils.get_url()
 
+    # Replace with real logic
+    overdue_amount = "25,000"
+    overdue_days = "45"
+
+    base_url = frappe.utils.get_url()
     sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
     justification_url = f"{sales_order_url}#justification"
     cancel_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
- message = (
+    # Format message to look like a table using pipe and dashes
+    message = (
         "🛑 *Sales Order Blocked Due to Overdue!*\n\n"
         "```plaintext\n"
         "| Field            | Value                                         |\n"
@@ -19,18 +24,13 @@ def send_overdue_notification(sales_order):
         f"| Customer         | {doc.customer_name}                            |\n"
         f"| Created By       | {doc.owner}                                    |\n"
         f"| Date             | {doc.creation.strftime('%Y-%m-%d')}            |\n"
-        f"| Overdue Amount   | ₹{overdue_amount}                              |\n"
-        f"| Overdue Days     | {overdue_days}                                 |\n"
         "```"
         "\n\n👉 *Next Actions:*\n"
         f"- 📝 [Submit Justification]({justification_url})\n"
         f"- ❌ [Cancel Order]({cancel_url})"
     )
 
-
-    # Raven Webhook
     raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
-
     headers = {
         "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",
         "Content-Type": "application/json"
