@@ -9,18 +9,17 @@ def send_overdue_notification(sales_order):
     justification_url = f"{sales_order_url}#justification"
     cancel_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
-    message = (
-        f"🛑 Sales Order Blocked Due to Overdue!\n"
-        f"\n"
-        f"Sales Order : {doc.name}\n\n"
-        f"Customer : {doc.customer_name}\n\n"
-        f"Created By : {doc.owner}\n\n"
-        f"Date : {doc.creation.strftime('%Y-%m-%d')}\n\n"
-        f"\n"
-        f"👉 Next Actions:\n\n"
-        f"📝 Submit Justification: {justification_url}\n\n"
-        f"❌ Cancel Order: {cancel_url}"
-    )
+   message = (
+    f"# 🛑 Sales Order Blocked Due to Overdue!\n\n"
+    f"**Sales Order:** {doc.name}\n"
+    f"**Customer:** {doc.customer_name}\n"
+    f"**Created By:** {doc.owner}\n"
+    f"**Date:** {doc.creation.strftime('%Y-%m-%d')}\n\n"
+    f"**👉 Next Actions:**\n"
+    f"* 📝 Submit Justification: {justification_url}\n"
+    f"* ❌ Cancel Order: {cancel_url}"
+)
+
 
     raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
     headers = {
