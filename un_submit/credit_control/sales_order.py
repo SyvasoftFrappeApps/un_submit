@@ -10,21 +10,20 @@ def send_overdue_notification(sales_order):
     justification_url = f"{sales_order_url}#justification"
     cancel_order_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
-    html_message = f"""
-<b>🛑 Sales Order Blocked Due to Overdue!</b><br><br>
+    message = f"""
+```text
+🛑 Sales Order Blocked Due to Overdue!
 
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
-    <tr><td><b>Sales Order</b></td><td><a href="{sales_order_url}">{doc.name}</a></td></tr><br>
-    <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr><br>
-    <tr><td><b>Created By</b></td><td>{doc.owner}</td></tr><br>
-    <tr><td><b>Date</b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
-    <tr><td><b>Overdue Amount</b></td><td>₹XX,XXX</td></tr><br>
-    <tr><td><b>Overdue Days</b></td><td>XX</td></tr>
-</table><br>
+Sales Order     : {doc.name}
+Customer        : {doc.customer_name}
+Created By      : {doc.owner}
+Date            : {doc.creation.strftime('%Y-%m-%d')}
+Overdue Amount  : ₹{overdue_amount}
+Overdue Days    : {overdue_days}
 
-<b>👉 Next Actions:</b><br>
-📝 <a href="{justification_url}">Submit Justification</a><br>
-❌ <a href="{cancel_order_url}">Cancel Order</a>
+👉 Next Actions:
+📝 Submit Justification → {justification_url}
+❌ Cancel Order         → {cancel_url}
 """
 
     # Raven Webhook
@@ -37,8 +36,7 @@ def send_overdue_notification(sales_order):
 
     payload = {
         "channel_id": "general",
-        "text": html_message,
-        "is_html": True  # This tells Raven to render the message as HTML
+        "text": message
     }
 
     try:
