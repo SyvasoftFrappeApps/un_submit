@@ -24,8 +24,8 @@ def send_overdue_notification(sales_order):
 	Overdue Days	{overdue_days}
 
 	👉 *Next Actions:*
-	- 📝 Submit Justification: {justification_url}
-	- ❌ Cancel Order: {cancel_url}
+	- 📝 [Submit Justification]({justification_url})
+    - ❌ [Cancel Order]({cancel_url})
 	"""
 
     frappe.get_doc({
