@@ -5,7 +5,7 @@ import frappe
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
 
-    # Replace with real logic
+    # Replace with actual overdue values from your logic
     overdue_amount = "25,000"
     overdue_days = "45"
 
@@ -14,20 +14,18 @@ def send_overdue_notification(sales_order):
     justification_url = f"{sales_order_url}#justification"
     cancel_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
-    # Format message to look like a table using pipe and dashes
+    # Properly formatted message using plain text
     message = (
-        "🛑 *Sales Order Blocked Due to Overdue!*\n\n"
-        "```plaintext\n"
-        "| Field            | Value                                         |\n"
-        "|------------------|-----------------------------------------------|\n"
-        f"| Sales Order      | {doc.name}                                     |\n"
-        f"| Customer         | {doc.customer_name}                            |\n"
-        f"| Created By       | {doc.owner}                                    |\n"
-        f"| Date             | {doc.creation.strftime('%Y-%m-%d')}            |\n"
-        "```"
-        "\n\n👉 *Next Actions:*\n"
-        f"- 📝 [Submit Justification]({justification_url})\n"
-        f"- ❌ [Cancel Order]({cancel_url})"
+        "🛑 Sales Order Blocked Due to Overdue!\n\n"
+        f"Sales Order     : {doc.name}\n"
+        f"Customer        : {doc.customer_name}\n"
+        f"Created By      : {doc.owner}\n"
+        f"Date            : {doc.creation.strftime('%Y-%m-%d')}\n"
+        f"Overdue Amount  : ₹{overdue_amount}\n"
+        f"Overdue Days    : {overdue_days}\n\n"
+        "👉 Next Actions:\n"
+        f"📝 Submit Justification: {justification_url}\n"
+        f"❌ Cancel Order: {cancel_url}"
     )
 
     raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
