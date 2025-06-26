@@ -8,7 +8,7 @@ def send_overdue_notification(sales_order):
 
     sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
     justification_url = f"{sales_order_url}#justification"
-    cancel_order_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
+    cancel_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
 
     message = f"""
 ```text
