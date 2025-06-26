@@ -8,17 +8,22 @@ def send_overdue_notification(sales_order):
     sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
     justification_url = f"{sales_order_url}#justification"
     cancel_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
+    subject = "Sales Order Blocked Due to Overdue!"
+    raven_message = (
+    f"Sales Order: {doc.name}<br>"
+    f"Customer: {doc.customer_name}<br>"
+    f"Created By: {doc.owner}<br>"
+    f"Date: {doc.creation.strftime('%Y-%m-%d')}<br><br>"
+    f"👉 Next Actions:<br><br>"
+    f"📝 Submit Justification: <a href='{justification_url}'>{justification_url}</a><br><br>"
+    f"❌ Cancel Order: <a href='{cancel_url}'>{cancel_url}</a>"
+    )
 
-   message = (
-    f"# 🛑 Sales Order Blocked Due to Overdue!\n\n"
-    f"**Sales Order:** {doc.name}\n"
-    f"**Customer:** {doc.customer_name}\n"
-    f"**Created By:** {doc.owner}\n"
-    f"**Date:** {doc.creation.strftime('%Y-%m-%d')}\n\n"
-    f"**👉 Next Actions:**\n"
-    f"* 📝 Submit Justification: {justification_url}\n"
-    f"* ❌ Cancel Order: {cancel_url}"
+rendered_message = Markup(
+    f"<h2><b>{subject}</b></h2><br>"
+    f"{raven_message}"
 )
+
 
 
     raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
@@ -28,7 +33,7 @@ def send_overdue_notification(sales_order):
     }
     payload = {
         "channel_id": "general",
-        "text": message
+        "text": rendered_message
     }
 
     try:
