@@ -29,7 +29,7 @@ def send_overdue_notification(sales_order):
     <tr><td><b>Order Total    : </b></td><td>{doc.rounded_total}</td></tr><br>
 </table>
 <table>
-    <tr><td><b>OverDue Amount : </b></td><td>{doc.rounded_total}</td></tr><br>
+    <tr><td><b>OverDue Amount : </b></td><td>{overdue_amount}</td></tr><br>
 </table>
 
 <b>👉 Next Actions:</b><br>
