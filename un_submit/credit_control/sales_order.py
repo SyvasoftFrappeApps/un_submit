@@ -1,6 +1,55 @@
 import requests
 import frappe
 
+def on_update(doc, method=None):
+    for row in doc.override_justifications:
+        if row.status == "Pending" and not row.notified:
+            send_justification_notification(doc, row)
+            row.notified = 1  # Add a custom checkbox field to avoid repeat notifications
+            updated = True
+    if updated:
+        doc.save(ignore_permissions=True)
+
+
+def send_justification_notification(doc, justification_row):
+    base_url = frappe.utils.get_url()
+    sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
+    
+    message = f"""
+<b>📝 New Justification Submitted for Approval</b><br><br>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
+    <tr><td><b>Sales Order</b></td><td><a href="{sales_order_url}">{doc.name}</a></td></tr>
+</table>
+<table>
+    <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr>
+</table>
+<table>    
+    <tr><td><b>Submitted By</b></td><td>{justification_row.created_by}</td></tr>
+</table>
+<table>
+    <tr><td><b>Justification</b></td><td>{justification_row.justification}</td></tr>
+</table><br>
+<b>Status:</b> Pending Approval
+"""
+
+    # Raven notification
+    payload = {
+        "channel_id": "general",  # Your approval channel ID
+        "text": message,
+        "is_html": True
+    }
+    headers = {
+        "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",
+        "Content-Type": "application/json"
+    }
+    url = f"{base_url}/api/method/raven.api.raven_message.send_message"
+
+    try:
+        requests.post(url, headers=headers, json=payload)
+    except Exception as e:
+        frappe.log_error(str(e), "Raven Justification Notification Failed")
+
+
 @frappe.whitelist()
 def send_overdue_notification(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
