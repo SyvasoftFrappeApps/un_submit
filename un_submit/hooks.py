@@ -178,7 +178,7 @@ doc_events = {
     },
      "Sales Order": {
         "before_submit": "un_submit.credit_control.credit_control.check_overdue_for_customer",
-        "on_update": "your_app.path.to.sales_order.on_update"
+        "on_update": "un_submit.credit_control.sales_order.on_update"
     }
 }
 # Scheduled Tasks
