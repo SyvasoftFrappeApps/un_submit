@@ -2,6 +2,7 @@ import requests
 import frappe
 
 def on_update(doc, method=None):
+    updated = False
     for row in doc.override_justifications:
         if row.status == "Pending" and not row.notified:
             send_justification_notification(doc, row)
