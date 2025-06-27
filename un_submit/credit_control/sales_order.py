@@ -24,13 +24,13 @@ def send_overdue_notification(sales_order):
 </table>
 <table>
     <tr><td><b>Order Date     : </b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
-</table><br>
+</table>
 <table>
     <tr><td><b>Order Total    : </b></td><td>{doc.rounded_total}</td></tr><br>
-</table><br>
+</table>
 <table>
     <tr><td><b>OverDue Amount : </b></td><td>{doc.rounded_total}</td></tr><br>
-</table><br>
+</table>
 
 <b>👉 Next Actions:</b><br>
 📝 <a href="{justification_url}">Submit Justification</a><br>
