@@ -9,7 +9,10 @@ def send_overdue_notification(sales_order):
     sales_order_url = f"{base_url}/app/sales-order/{doc.name}"
     justification_url = f"{sales_order_url}#justification"
     cancel_order_url = f"{base_url}/api/method/un_submit.credit_control.cancel_order?sales_order={doc.name}"
-
+    from un_submit.credit_control.credit_control import check_overdue_for_customer
+    overdue_info = check_overdue_for_customer(doc.customer, doc.name)
+    overdue_amount = overdue_info.get("overdue_amount", 0)
+    overdue_days = overdue_info.get("overdue_limit", 0)
     html_message = f"""
 <b>🛑 Sales Order Blocked Due to Overdue!</b><br><br>
 
@@ -17,13 +20,16 @@ def send_overdue_notification(sales_order):
     <tr><td><b>Sales Order</b></td><td><a href="{sales_order_url}">{doc.name}</a></td></tr><br>
 </table>
 <table>
-    <tr><td><b>Customer</b></td><td>{doc.customer_name}</td></tr><br>
+    <tr><td><b>Customer Name  : </b></td><td>{doc.customer_name}</td></tr><br>
 </table>
 <table>
-    <tr><td><b>Created By</b></td><td>{doc.owner}</td></tr><br>
-</table>
+    <tr><td><b>Order Date     : </b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
+</table><br>
 <table>
-    <tr><td><b>Date</b></td><td>{doc.creation.strftime('%Y-%m-%d')}</td></tr><br>
+    <tr><td><b>Order Total    : </b></td><td>{doc.rounded_total}</td></tr><br>
+</table><br>
+<table>
+    <tr><td><b>OverDue Amount : </b></td><td>{doc.rounded_total}</td></tr><br>
 </table><br>
 
 <b>👉 Next Actions:</b><br>
@@ -32,7 +38,7 @@ def send_overdue_notification(sales_order):
 """
 
     # Raven Webhook
-    raven_url = "http://62.171.191.18/api/method/raven.api.raven_message.send_message"
+    raven_url = f"{base_url}/api/method/raven.api.raven_message.send_message"
 
     headers = {
         "Authorization": "token e9ffc25922df3cd:7398f8d1116bf33",
