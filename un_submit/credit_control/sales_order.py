@@ -108,3 +108,12 @@ def send_overdue_notification(sales_order):
     except requests.RequestException as e:
         frappe.log_error(str(e), "Raven Notification Failed")
         return "Failed to send notification"
+        
+@frappe.whitelist()
+def get_pending_justifications():
+    """API to fetch all pending justifications"""
+    return frappe.get_all(
+        "Sales Order Override Justification",
+        filters={"status": "Approved"},
+        fields=["name", "sales_order", "justification", "date_created", "created_by"]
+    )
