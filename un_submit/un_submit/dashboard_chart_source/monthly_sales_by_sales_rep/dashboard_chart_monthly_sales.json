@@ -1,0 +1,18 @@
+[
+  {
+    "doctype": "Dashboard Chart",
+    "chart_name": "Monthly Sales by Sales Rep",
+    "chart_type": "Bar",
+    "based_on": "Report",
+    "report_name": "Monthly Sales by Sales Rep",
+    "x_field": "month",
+    "y_field": "total",
+    "group_by": "sales_person",
+    "timeseries": 1,
+    "filters_json": "{}",
+    "docstatus": 0,
+    "is_custom": 1,
+    "dashboard": null,
+    "custom_options": null
+  }
+]
