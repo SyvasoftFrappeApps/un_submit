@@ -115,5 +115,5 @@ def get_pending_justifications():
     return frappe.get_all(
         "Sales Order Override Justification",
         filters={"status": "Approved"},
-        fields=["name", "sales_order", "justification", "date_created", "created_by"]
+        fields=["name", "sales_order", "justification", "date_created", "created_by", "order_total"]
     )
