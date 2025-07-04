@@ -1,5 +1,4 @@
 import frappe
-from frappe.utils import getdate
 
 def execute(filters=None):
     columns = [
@@ -8,16 +7,25 @@ def execute(filters=None):
         {"label": "Total Sales", "fieldname": "total", "fieldtype": "Currency", "width": 120},
     ]
 
-    data = frappe.db.sql("""
+    conditions = ""
+    values = {}
+
+    if filters:
+        if filters.get("month"):
+            month = tuple(filters["month"])
+            conditions += " AND DATE_FORMAT(si.posting_date, '%Y-%m') IN %(month)s"
+            values["month"] = month
+
+    data = frappe.db.sql(f"""
         SELECT 
-            DATE_FORMAT(si.posting_date, '%Y-%m') AS month,
+            DATE_FORMAT(si.posting_date, '%%Y-%%m') AS month,
             sp.sales_person AS sales_person,
             SUM(si.base_net_total) AS total
         FROM `tabSales Invoice` si
         JOIN `tabSales Team` sp ON sp.parent = si.name
-        WHERE si.docstatus = 1
+        WHERE si.docstatus = 1 {conditions}
         GROUP BY month, sales_person
         ORDER BY month DESC, sales_person ASC
-    """, as_dict=1)
+    """, values, as_dict=True)
 
     return columns, data

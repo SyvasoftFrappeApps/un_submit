@@ -3,6 +3,11 @@
 
 frappe.query_reports["Monthly Sales by Sales Rep"] = {
         "filters": [
-
+					{
+			"fieldname": "month",
+			"label": "Month/Year",
+			"fieldtype": "Link",
+			"options": "month"
+		}
         ]
 };
