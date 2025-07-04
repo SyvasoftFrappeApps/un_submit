@@ -7,10 +7,8 @@ frappe.query_reports["Monthly Sales by Sales Rep"] = {
 			"get_data": function (txt) {
 				return frappe.db.get_list('Sales Invoice', {
 					fields: ["posting_date"],
-					filters: {
-						docstatus: 1
-					},
-					limit: 1000
+					filters: { docstatus: 1 },
+					limit: 500
 				}).then(res => {
 					let months = new Set();
 					res.forEach(r => {
