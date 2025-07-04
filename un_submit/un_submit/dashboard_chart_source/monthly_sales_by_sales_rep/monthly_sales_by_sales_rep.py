@@ -1,23 +1,48 @@
-import frappe
-from frappe.utils import getdate
+# Path: your_app/your_app/dashboard_chart_source/monthly_sales_by_sales_rep/monthly_sales_by_sales_rep.py
 
-def execute(filters=None):
-    columns = [
-        {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 100},
-        {"label": "Sales Rep", "fieldname": "sales_person", "fieldtype": "Data", "width": 150},
-        {"label": "Total Sales", "fieldname": "total", "fieldtype": "Currency", "width": 120},
-    ]
+import frappe
+
+def get_chart_data(filters=None):
+    conditions = ""
+    values = {}
+
+    if filters.get("month"):
+        months = tuple(filters["month"])
+        conditions += " AND DATE_FORMAT(si.posting_date, '%Y-%m') IN %(months)s"
+        values["months"] = months
 
     data = frappe.db.sql("""
         SELECT 
             DATE_FORMAT(si.posting_date, '%Y-%m') AS month,
-            sp.sales_person AS sales_person,
+            sp.sales_person,
             SUM(si.base_net_total) AS total
         FROM `tabSales Invoice` si
         JOIN `tabSales Team` sp ON sp.parent = si.name
-        WHERE si.docstatus = 1
-        GROUP BY month, sales_person
-        ORDER BY month DESC, sales_person ASC
-    """, as_dict=1)
+        WHERE si.docstatus = 1 {conditions}
+        GROUP BY month, sp.sales_person
+        ORDER BY month, sp.sales_person
+    """.format(conditions=conditions), values=values, as_dict=True)
 
-    return columns, data
+    dataset = {}
+    labels = set()
+
+    for row in data:
+        labels.add(row["month"])
+        if row["sales_person"] not in dataset:
+            dataset[row["sales_person"]] = {}
+        dataset[row["sales_person"]][row["month"]] = float(row["total"])
+
+    labels = sorted(list(labels))
+    datasets = []
+
+    for sales_person, month_totals in dataset.items():
+        row_data = [month_totals.get(label, 0) for label in labels]
+        datasets.append({
+            "name": sales_person,
+            "values": row_data
+        })
+
+    return {
+        "labels": labels,
+        "datasets": datasets
+    }
