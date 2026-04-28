@@ -39,7 +39,7 @@ def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
 def custom_validate_with_previous_doc(self, *args, **kwargs):
 	pass
 
-		
+
 def custom_validate_rate_with_reference_doc(self, ref_details):
 	if self.get("is_internal_supplier"):
 		return
@@ -63,7 +63,6 @@ def custom_validate_rate_with_reference_doc(self, ref_details):
 			if d.get(ref_link_field):
 				ref_rate = reference_details.get(d.get(ref_link_field))
 
-				# Guard against None when item has no reference doc link
 				if ref_rate is None:
 					frappe.msgprint(
 						_("Row #{0}: No reference rate found for item {1}. Rate validation skipped.").format(
@@ -122,14 +121,11 @@ from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import ex
 
 @frappe.whitelist()
 def after_submit_purchase_receipt(doc, method):
-	# Convert doc to a dictionary if it is a JSON string
 	if isinstance(doc, str):
 		doc = json.loads(doc)
 
-	# Ensure the purchase receipt is not ignoring permissions
 	if doc.get("ignore_permissions") == 1:
 		try:
-			# Create a new Repost Item Valuation
 			repost_doc = frappe.get_doc({
 				"doctype": "Repost Item Valuation",
 				"based_on": "Transaction",
@@ -137,11 +133,9 @@ def after_submit_purchase_receipt(doc, method):
 				"voucher_no": doc.get("name")
 			})
 
-			# Insert and Submit the document
 			repost_doc.insert()
 			repost_doc.submit()
 
-			# Manually execute the reposting function
 			frappe.get_doc("Scheduled Job Type", "repost_item_valuation.repost_entries").enqueue(force=True)
 
 			frappe.msgprint(f"Repost Item Valuation created for {doc.get('name')}")
