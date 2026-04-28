@@ -1,6 +1,7 @@
 import frappe
 import json
 from frappe.utils import cint, flt, get_datetime, getdate, nowdate
+from frappe import _
 
 def custom_validate_duplicate_serial_and_batch_bundle(self, table_name):
 	if not self.get(table_name):
@@ -65,10 +66,10 @@ def custom_validate_rate_with_reference_doc(self, ref_details):
 
 				if ref_rate is None:
 					frappe.msgprint(
-						_("Row #{0}: No reference rate found for item {1}. Rate validation skipped.").format(
+						"Row #{0}: No reference rate found for item {1}. Rate validation skipped.".format(
 							d.idx, d.item_code
 						),
-						title=_("Warning"),
+						title="Warning",
 						indicator="orange",
 					)
 					continue
