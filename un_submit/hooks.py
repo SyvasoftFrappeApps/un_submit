@@ -175,10 +175,6 @@ doc_events = {
     },
     "Purchase Invoice": {
         "before_cancel": "un_submit.server_script.purchase_invoice.before_cancel"
-    },
-     "Sales Order": {
-        "before_submit": "un_submit.credit_control.credit_control.check_overdue_for_customer",
-        "on_update": "un_submit.credit_control.sales_order.on_update"
     }
 }
 # Scheduled Tasks
